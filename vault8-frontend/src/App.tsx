@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ActionButtonList } from './components/ActionButtonList'
 import { InfoList } from './components/InfoList'
 import CrossChainMessaging from './components/cross-chain-messaging'
+import BaseReceiverViewer from './components/BaseReceiverViewer'
 import { projectId, metadata, networks, wagmiAdapter , solanaWeb3JsAdapter} from './config'
 
 import "./App.css"
@@ -49,6 +50,7 @@ export function App() {
               </p>
             </div>
             <CrossChainMessaging />
+            <BaseReceiverViewer />
             <InfoList />
         </QueryClientProvider>
       </WagmiProvider>
