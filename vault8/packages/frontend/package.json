@@ -1,0 +1,44 @@
+{
+  "name": "react-wagmi-appkit",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+  "build": "tsc -p tsconfig.app.json --noEmit && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@layerzerolabs/lz-solana-sdk-v2": "^3.0.140",
+    "@layerzerolabs/lz-v2-utilities": "^3.0.140",
+    "@metaplex-foundation/umi": "file:../../node_modules/.pnpm/@metaplex-foundation+umi@0.9.2/node_modules/@metaplex-foundation/umi",
+    "@metaplex-foundation/umi-bundle-defaults": "file:../../node_modules/.pnpm/@metaplex-foundation+umi-bundle-defaults@0.9.2_@metaplex-foundation+umi@0.9.2_@solana+web3.js@1.95.8/node_modules/@metaplex-foundation/umi-bundle-defaults",
+    "@metaplex-foundation/umi-web3js-adapters": "file:../../node_modules/.pnpm/@metaplex-foundation+umi-web3js-adapters@0.9.2_@metaplex-foundation+umi@0.9.2_@solana+web3.js@1.95.8/node_modules/@metaplex-foundation/umi-web3js-adapters",
+  "@metaplex-foundation/umi-signer-wallet-adapters": "^0.9.2",
+    "@reown/appkit": "1.8.10",
+    "@reown/appkit-adapter-solana": "1.8.10",
+    "@reown/appkit-adapter-wagmi": "1.8.10",
+    "@solana/web3.js": "^1.98.4",
+    "@tanstack/react-query": "^5.56.2",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "viem": "^2.31.3",
+    "wagmi": "^2.12.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "globals": "^15.9.0",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.0.1",
+    "vite": "^6.2.0"
+  }
+}
