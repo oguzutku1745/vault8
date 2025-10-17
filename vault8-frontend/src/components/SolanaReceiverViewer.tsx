@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Connection } from '@solana/web3.js'
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi'
+import { OAPP_PROGRAM_ID } from '../../utils/layerzero'
 
-const PROGRAM_ID = '9hYxCB1KnVzRpCBtKktvCA77F28pE8H35g4WgiopzwyJ'
+const PROGRAM_ID = OAPP_PROGRAM_ID.toBase58()
 
 const SolanaReceiverViewer: React.FC = () => {
   const [value, setValue] = useState<string>('')
@@ -23,9 +24,22 @@ const SolanaReceiverViewer: React.FC = () => {
       const umi = await createUmiBrowser.createUmiBrowser(connection)
       const pid = umiPublicKey(PROGRAM_ID)
       const { MyOAppPDA } = pdaMod as any
-      const [storePda] = new MyOAppPDA(pid).oapp()
-  const acc = await modAccounts.fetchStore({ rpc: umi.rpc }, storePda)
-      setValue((acc as any).data.string)
+      const storePdaTuple = new MyOAppPDA(pid).oapp()
+      const storePubkey = storePdaTuple[0]
+      const acc = await modAccounts.safeFetchStore({ rpc: umi.rpc }, storePubkey)
+      const storePdaStr = storePubkey.toString()
+      console.debug('[SolanaReceiverViewer] storePda', storePdaStr, 'account:', acc)
+      if (!acc) {
+        setError('Store account not found on devnet. Has the program been initialized?')
+        setValue('')
+        return
+      }
+      // Kinobi + Umi sometimes return account fields flattened at top-level.
+      const topLevel = (acc as any).string
+      const nested = (acc as any).data?.string
+      const val = typeof topLevel === 'string' ? topLevel : typeof nested === 'string' ? nested : ''
+      setValue(String(val))
+      setError(null)
     } catch (e: any) {
       setError(e?.message ?? String(e))
     } finally {
