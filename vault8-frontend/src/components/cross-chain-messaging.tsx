@@ -146,7 +146,7 @@ const CrossChainMessaging = () => {
         // Fallback: build a VersionedTransaction directly with web3.js and sign via AppKit wallet
         const computeIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 })
         const web3Ix = toWeb3JsInstruction(sendInstruction.instruction)
-        const { blockhash } = await connection.getLatestBlockhash('confirmed')
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
         const msg = new TransactionMessage({
           payerKey: walletPubkey,
           recentBlockhash: blockhash,
@@ -161,7 +161,11 @@ const CrossChainMessaging = () => {
         console.log('✅ Transaction sent:', signature)
         console.log('🔗 View on Solscan:', `https://solscan.io/tx/${signature}?cluster=devnet`)
         console.log('🌐 Track on LayerZero Scan:', `https://testnet.layerzeroscan.com/tx/${signature}`)
-        await connection.confirmTransaction(signature, 'confirmed')
+        try {
+          await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
+        } catch (e) {
+          console.warn('confirmTransaction timed out; check explorers for eventual status', e)
+        }
         alert(`✅ Message sent successfully!\n\nTX: ${signature}`)
       }
       
