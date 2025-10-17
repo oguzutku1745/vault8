@@ -7,6 +7,8 @@ import { ActionButtonList } from './components/ActionButtonList'
 import { InfoList } from './components/InfoList'
 import CrossChainMessaging from './components/cross-chain-messaging'
 import BaseReceiverViewer from './components/BaseReceiverViewer'
+import BaseToSolanaSender from './components/BaseToSolanaSender'
+import SolanaReceiverViewer from './components/SolanaReceiverViewer'
 import { projectId, metadata, networks, wagmiAdapter , solanaWeb3JsAdapter} from './config'
 
 import "./App.css"
@@ -51,6 +53,8 @@ export function App() {
             </div>
             <CrossChainMessaging />
             <BaseReceiverViewer />
+            <BaseToSolanaSender />
+            <SolanaReceiverViewer />
             <InfoList />
         </QueryClientProvider>
       </WagmiProvider>
