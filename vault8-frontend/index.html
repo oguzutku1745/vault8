@@ -1,0 +1,38 @@
+<!doctype html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/reown.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reown Appkit Example</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Tiny inline shim: define `process` early so browser bundles that
+         reference `process.version` / `process.browser` at module load
+         time don't throw. Kept minimal and safe. -->
+    <script>
+      (function () {
+        try {
+          if (typeof window.process === 'undefined') {
+            window.process = {
+              browser: true,
+              version: 'v20.19.5',
+              env: {},
+              nextTick: function (cb) {
+                var args = Array.prototype.slice.call(arguments, 1)
+                return setTimeout(function () {
+                  cb.apply(null, args)
+                }, 0)
+              },
+            }
+          }
+        } catch (e) {
+          // no-op
+        }
+      })()
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
