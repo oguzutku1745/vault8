@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/react-shims.d.ts","./src/vite-env.d.ts","./src/adapters/umiappkitsigner.ts","./src/components/actionbuttonlist.tsx","./src/components/infolist.tsx","./src/components/cross-chain-messaging.tsx","./src/config/index.tsx"],"errors":true,"version":"5.9.3"}
