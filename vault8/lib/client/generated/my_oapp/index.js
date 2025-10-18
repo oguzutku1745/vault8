@@ -20,6 +20,10 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
-// ESM shim: re-export the ESM source so the browser imports named exports
-// instead of the compiled CommonJS barrel.
-export * from './esm-index.ts'
+Object.defineProperty(exports, "__esModule", { value: true });
+__exportStar(require("./accounts"), exports);
+__exportStar(require("./errors"), exports);
+__exportStar(require("./instructions"), exports);
+__exportStar(require("./programs"), exports);
+__exportStar(require("./shared"), exports);
+__exportStar(require("./types"), exports);

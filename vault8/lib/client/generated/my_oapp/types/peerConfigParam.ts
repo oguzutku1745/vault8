@@ -57,8 +57,7 @@ export function peerConfigParam<K extends PeerConfigParamArgs['__kind']>(
     kind: K,
     data?: any
 ): Extract<PeerConfigParamArgs, { __kind: K }> {
-    // Kinobi-generated helper: cast to any to satisfy TypeScript when `K` is a generic
-        return Array.isArray(data) ? { __kind: kind, fields: data } : { __kind: kind, ...(data ?? {}) } as any
+    return Array.isArray(data) ? { __kind: kind, fields: data } : { __kind: kind, ...(data ?? {}) }
 }
 export function isPeerConfigParam<K extends PeerConfigParam['__kind']>(
     kind: K,

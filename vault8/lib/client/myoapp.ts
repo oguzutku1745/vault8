@@ -125,7 +125,7 @@ export class MyOApp {
         remainingAccounts?: AccountMeta[],
         commitment: Commitment = 'confirmed'
     ): Promise<WrappedInstruction> {
-    const { dstEid, nativeFee, lzTokenFee, message, options } = params
+        const { dstEid, nativeFee, lzTokenFee, message, options, composeMsg } = params
         const msgLibProgram = await this.getSendLibraryProgram(rpc, payer, dstEid)
         const [oapp] = this.pda.oapp()
         const [peer] = this.pda.peer(dstEid)
@@ -159,6 +159,7 @@ export class MyOApp {
                     // args
                     dstEid,
                     message,
+                    composeMsg: composeMsg ?? null,
                     options,
                     nativeFee: nativeFee,
                     lzTokenFee: lzTokenFee ?? 0,
@@ -219,7 +220,7 @@ export class MyOApp {
         remainingAccounts?: AccountMeta[],
         commitment: Commitment = 'confirmed'
     ): Promise<EndpointProgram.types.MessagingFee> {
-    const { dstEid, message, options, payInLzToken } = params
+        const { dstEid, message, options, payInLzToken, composeMsg } = params
         const msgLibProgram = await this.getSendLibraryProgram(rpc, payer, dstEid)
         const [oapp] = this.pda.oapp()
 
@@ -252,6 +253,7 @@ export class MyOApp {
                     // args
                     dstEid,
                     message,
+                    composeMsg: composeMsg ?? null,
                     options,
                     payInLzToken,
                     receiver: packetPath.receiver,

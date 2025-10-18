@@ -1,5 +1,99 @@
-// ESM shim: re-export the TypeScript source so browsers receive ESM named exports
-export * from './myoapp.ts'
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MyOApp = exports.MessageType = exports.MY_OAPP_PROGRAM_ID = exports.types = exports.instructions = exports.errors = exports.accounts = void 0;
+exports.getPeer = getPeer;
+exports.initConfig = initConfig;
+exports.initSendLibrary = initSendLibrary;
+exports.initReceiveLibrary = initReceiveLibrary;
+exports.initOAppNonce = initOAppNonce;
+const umi_1 = require("@metaplex-foundation/umi");
+const umi_program_repository_1 = require("@metaplex-foundation/umi-program-repository");
+const umi_web3js_adapters_1 = require("@metaplex-foundation/umi-web3js-adapters");
+const web3_js_1 = require("@solana/web3.js");
+const utils_1 = require("ethers/lib/utils");
+const umi_2 = require("@layerzerolabs/lz-solana-sdk-v2/umi");
+const accounts = __importStar(require("./generated/my_oapp/accounts"));
+exports.accounts = accounts;
+const errors = __importStar(require("./generated/my_oapp/errors"));
+exports.errors = errors;
+const instructions = __importStar(require("./generated/my_oapp/instructions"));
+exports.instructions = instructions;
+const types = __importStar(require("./generated/my_oapp/types"));
+exports.types = types;
+const pda_1 = require("./pda");
+var my_oapp_1 = require("./generated/my_oapp");
+Object.defineProperty(exports, "MY_OAPP_PROGRAM_ID", { enumerable: true, get: function () { return my_oapp_1.MY_OAPP_PROGRAM_ID; } });
+const ENDPOINT_PROGRAM_ID = umi_2.EndpointProgram.ENDPOINT_PROGRAM_ID;
+var MessageType;
+(function (MessageType) {
+    MessageType[MessageType["VANILLA"] = 1] = "VANILLA";
+    MessageType[MessageType["COMPOSED_TYPE"] = 2] = "COMPOSED_TYPE";
+})(MessageType || (exports.MessageType = MessageType = {}));
+class MyOApp {
+    constructor(programId, endpointProgramId = umi_2.EndpointProgram.ENDPOINT_PROGRAM_ID, rpc) {
+        this.programId = programId;
+        this.endpointProgramId = endpointProgramId;
+        this.pda = new pda_1.MyOAppPDA(programId);
+        if (rpc === undefined) {
+            rpc = (0, umi_1.createNullRpc)();
+            rpc.getCluster = () => 'custom';
+        }
+        this.programRepo = (0, umi_program_repository_1.createDefaultProgramRepository)({ rpc: rpc }, [
+            {
+                name: 'myOapp',
+                publicKey: programId,
+                getErrorFromCode(code, cause) {
+                    return errors.getMyOappErrorFromCode(code, this, cause);
+                },
+                getErrorFromName(name, cause) {
+                    return errors.getMyOappErrorFromName(name, this, cause);
+                },
+                isOnCluster() {
+                    return true;
+                },
+            },
+        ]);
+        this.eventAuthority = new umi_2.EventPDA(programId).eventAuthority()[0];
+        this.endpointSDK = new umi_2.EndpointProgram.Endpoint(endpointProgramId);
+    }
+    async getEnforcedOptions(rpc, remoteEid) {
+        const [peer] = this.pda.peer(remoteEid);
+        const peerInfo = await accounts.fetchPeerConfig({ rpc }, peer);
+        return peerInfo.enforcedOptions;
+    }
     getProgram(clusterFilter = 'custom') {
         return this.programRepo.get('myOapp', clusterFilter);
     }

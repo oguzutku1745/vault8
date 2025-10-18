@@ -1,5 +1,5 @@
 use crate::*;
-use oapp::endpoint_cpi::{get_accounts_for_clear, LzAccount};
+use oapp::endpoint_cpi::{get_accounts_for_clear, get_accounts_for_send_compose, LzAccount};
 use oapp::{endpoint::ID as ENDPOINT_ID, LzReceiveParams};
 
 /// `lz_receive_types` is queried off-chain by the Executor before calling
@@ -46,6 +46,17 @@ impl LzReceiveTypes<'_> {
             params.nonce,
         );
         accounts.extend(accounts_for_clear);
+
+        // Provide accounts required by Endpoint::send_compose (index 0, self-compose) so lz_receive can compose back
+        let accounts_for_compose = get_accounts_for_send_compose(
+            ENDPOINT_ID,
+            &store,              // from (payer)
+            &store,              // to (self in this demo) — the executor routes by GUID back to EVM
+            &params.guid,
+            0,                   // index must match the compose option index used on EVM
+            &params.message,
+        );
+        accounts.extend(accounts_for_compose);
 
         Ok(accounts)
     }
