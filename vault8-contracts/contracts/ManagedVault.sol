@@ -13,24 +13,40 @@ contract ManagedVault is ERC4626, Ownable {
 
     // Track total assets allocated to strategies
     uint256 public investedAssets;
+
+    address[] private _allowedStrategies;            // ordered list for enumeration
+    mapping(address => bool) private _isAllowedStrategy; // quick lookup for checks
+
     constructor(
         IERC20 asset_,
         string memory name_,
         string memory symbol_,
-        address initialOwner
+        address initialOwner,
+        address[] memory allowedStrategies_
     )
-        ERC20(name_, symbol_)       // Set custom ERC20 name and symbol
-        ERC4626(asset_)              // Set the vault’s underlying asset
-        Ownable(initialOwner)        // Set the initial owner
-    {}
+        ERC20(name_, symbol_)
+        ERC4626(asset_)
+        Ownable(initialOwner)
+    {
+        // store allowed strategies + mapping
+        for (uint i = 0; i < allowedStrategies_.length; ++i) {
+            address strat = allowedStrategies_[i];
+            require(strat != address(0), "ManagedVault: zero-strategy");
+            _isAllowedStrategy[strat] = true;
+            _allowedStrategies.push(strat);
+        }
+    }
 
 
     /// @notice Allocate funds from vault to a strategy (owner-only)
     function allocate(uint256 amount, IStrategy strategy) external onlyOwner {
-        IERC20 vaultToken = IERC20(asset()); // cast asset() address to IERC20
-        require(amount <= vaultToken.balanceOf(address(this)), "Not enough free assets");
+        require(_isAllowedStrategy[address(strategy)], "ManagedVault: not allowed strategy");
 
-        // Approve and call strategy (use SafeERC20 library function)
+        IERC20 vaultToken = IERC20(asset());
+        require(amount <= vaultToken.balanceOf(address(this)), "Not enough free assets");
+        require(amount > 0, "Zero amount");
+
+        // Approve and deposit into strategy
         SafeERC20.forceApprove(vaultToken, address(strategy), amount);
         strategy.deposit(amount);
 
@@ -39,6 +55,8 @@ contract ManagedVault is ERC4626, Ownable {
 
     /// @notice Recall funds from a strategy back to the vault (owner-only)
     function recall(uint256 amount, IStrategy strategy) external onlyOwner {
+        require(_isAllowedStrategy[address(strategy)], "ManagedVault: not allowed strategy");
+        require(amount > 0, "Zero amount");
         require(amount <= investedAssets, "Not enough invested assets");
 
         // Withdraw from strategy to this vault
@@ -46,6 +64,7 @@ contract ManagedVault is ERC4626, Ownable {
 
         investedAssets -= amount;
     }
+
 
     /// @notice Returns total assets: free in vault + invested in strategies
     function totalAssets() public view override returns (uint256) {
@@ -56,5 +75,14 @@ contract ManagedVault is ERC4626, Ownable {
         return strategy.balance();
     }
 
+    /// @notice Check if a strategy is allowed
+    function isStrategyAllowed(address strategy) public view returns (bool) {
+        return _isAllowedStrategy[strategy];
+    }
+
+    /// @notice Return the whole allowed strategy list
+    function allowedStrategies() external view returns (address[] memory) {
+        return _allowedStrategies;
+    }
 
 }
