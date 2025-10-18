@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use oapp::{
     endpoint::{
         cpi::accounts::Clear,
-        instructions::ClearParams,
+        instructions::{ClearParams, SendComposeParams},
         ConstructCPIContext, ID as ENDPOINT_ID,
     },
     LzReceiveParams,
@@ -52,10 +52,44 @@ impl LzReceive<'_> {
             },
         )?;
 
-        // From here on, you can process the message as needed by your use case.
-        let string_value = msg_codec::decode(&params.message)?;
+        // From here on, process the message. We support both legacy string and counter opcodes.
         let store = &mut ctx.accounts.store;
-        store.string = string_value;
+        // Try counter opcode first
+        if params.message.len() >= 9 {
+            if let Ok((opcode, val)) = msg_codec::decode_counter(&params.message) {
+                if opcode == msg_codec::OPCODE_INCREMENT {
+                    let inc_by = if val == 0 { 1 } else { val };
+                    store.counter = store
+                        .counter
+                        .checked_add(inc_by)
+                        .ok_or_else(|| error!(MyOAppError::Overflow))?;
+
+                    // Compose ACK back to source (index 0); executor pre-funds via Type-3 options
+                    let ack = msg_codec::encode_ack(store.counter);
+                    // Accounts for compose are appended after clear accounts in remaining_accounts.
+                    // As per docs, use SendComposeParams with guid and index 0.
+                    let seeds: &[&[u8]] = &[STORE_SEED, &[ctx.accounts.store.bump]];
+                    oapp::endpoint_cpi::send_compose(
+                        ENDPOINT_ID,
+                        ctx.accounts.store.key(),
+                        &ctx.remaining_accounts[Clear::MIN_ACCOUNTS_LEN..],
+                        seeds,
+                        SendComposeParams { to: ctx.accounts.store.key(), guid: params.guid, index: 0, message: ack },
+                    )?;
+                } else if opcode == msg_codec::OPCODE_ACK {
+                    // No-op on Solana for ACKs in this demo
+                } else {
+                    // Fallback to legacy decode
+                    if let Ok(s) = msg_codec::decode_string(&params.message) {
+                        store.string = s;
+                    }
+                }
+            } else if let Ok(s) = msg_codec::decode_string(&params.message) {
+                store.string = s;
+            }
+        } else if let Ok(s) = msg_codec::decode_string(&params.message) {
+            store.string = s;
+        }
 
         Ok(())
     }

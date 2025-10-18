@@ -1,77 +1,68 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.22;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { OApp, MessagingFee, Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import { MessagingReceipt } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import { OAppOptionsType3 } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
-import { StringMsgCodec } from "./libs/StringMsgCodec.sol";
+import { CounterMsgCodec } from "./libs/CounterMsgCodec.sol";
 
-contract MyOApp is OApp, OAppOptionsType3 {
-    using StringMsgCodec for bytes;
+contract MyOApp is OApp, OAppOptionsType3, Ownable {
+    using CounterMsgCodec for bytes;
+
+    // For legacy UI/debugging
+    string public data = "Nothing received yet.";
+    // Counter updated via compose ACK from Solana
+    uint64 public counter;
 
     constructor(address _endpoint, address _delegate) OApp(_endpoint, _delegate) Ownable(_delegate) {}
 
-    string public data = "Nothing received yet.";
-
-    /**
-     * @notice Sends a message from the source chain to a destination chain.
-     * @param _dstEid The endpoint ID of the destination chain.
-     * @param _string The message string to be sent.
-     * @param _options Additional options for message execution.
-     * @dev Encodes the message as bytes and sends it using the `_lzSend` internal function.
-     * @return receipt A `MessagingReceipt` struct containing details of the message sent.
-     */
-    function send(
+    // Type-3: request an increment on Solana; msg.value must cover both lzReceive and compose budgets
+    function requestIncrement(
         uint32 _dstEid,
-        string calldata _string,
+        uint64 _by,
         bytes calldata _options
     ) external payable returns (MessagingReceipt memory receipt) {
-        bytes memory _message = abi.encodePacked(abi.encode(uint256(bytes(_string).length)), bytes(_string));
-        bytes memory options = combineOptions(_dstEid, StringMsgCodec.VANILLA_TYPE, _options);
-        receipt = _lzSend(_dstEid, _message, options, MessagingFee(msg.value, 0), payable(msg.sender));
+        bytes memory payload = CounterMsgCodec.encIncrement(_by);
+        bytes memory options = combineOptions(_dstEid, /*msgType*/ 1, _options);
+        receipt = _lzSend(_dstEid, payload, options, MessagingFee(msg.value, 0), payable(msg.sender));
     }
 
-    /**
-     * @notice Quotes the gas needed to pay for the full omnichain transaction in native gas or ZRO token.
-     * @param _dstEid Destination chain's endpoint ID.
-     * @param _message The message.
-     * @param _options Message execution options (e.g., for sending gas to destination).
-     * @param _payInLzToken Whether to return fee in ZRO token.
-     * @return fee A `MessagingFee` struct containing the calculated gas fee in either the native token or ZRO token.
-     */
-    function quote(
+    function quoteIncrement(
         uint32 _dstEid,
-        string calldata _message,
+        uint64 _by,
         bytes calldata _options,
         bool _payInLzToken
-    ) public view returns (MessagingFee memory fee) {
-        bytes memory payload = abi.encodePacked(abi.encode(uint256(bytes(_message).length)), bytes(_message));
-        bytes memory options = combineOptions(_dstEid, StringMsgCodec.VANILLA_TYPE, _options);
-        fee = _quote(_dstEid, payload, options, _payInLzToken);
+    ) external view returns (MessagingFee memory fee) {
+        bytes memory payload = CounterMsgCodec.encIncrement(_by);
+        bytes memory options = combineOptions(_dstEid, /*msgType*/ 1, _options);
+        return _quote(_dstEid, payload, options, _payInLzToken);
     }
 
-    /**
-     * @dev Internal function override to handle incoming messages from another chain.
-     * @dev _origin A struct containing information about the message sender.
-     * @dev _guid A unique global packet identifier for the message.
-     * @param payload The encoded message payload being received.
-     *
-     * @dev The following params are unused in the current implementation of the OApp.
-     * @dev _executor The address of the Executor responsible for processing the message.
-     * @dev _extraData Arbitrary data appended by the Executor to the message.
-     *
-     * Decodes the received payload and processes it as per the business logic defined in the function.
-     */
+    // Not used for this flow; kept for compatibility with message-only paths
     function _lzReceive(
-        Origin calldata /*_origin*/,
-        bytes32 /*_guid*/,
+        Origin calldata,
+        bytes32,
         bytes calldata payload,
-        address /*_executor*/,
-        bytes calldata /*_extraData*/
+        address,
+        bytes calldata
     ) internal override {
-        string memory stringValue = StringMsgCodec.decode(payload);
-        data = stringValue;
+        // Decode legacy string if present
+        // no-op for counter flow
+        data = string(payload);
+    }
+
+    // Compose callback on EVM (ack from Solana)
+    function _lzCompose(
+        Origin calldata,
+        bytes32,
+        bytes calldata payload,
+        address,
+        bytes calldata
+    ) internal override {
+        (uint8 op, uint64 val) = CounterMsgCodec.dec(payload);
+        if (op == CounterMsgCodec.OPCODE_ACK) {
+            counter = val;
+        }
     }
 }
