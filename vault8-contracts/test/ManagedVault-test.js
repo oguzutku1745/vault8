@@ -21,11 +21,14 @@ describe("ManagedVault", function () {
 
    // Deploy managed vault with updated constructor
     const ManagedVault = await ethers.getContractFactory("ManagedVault");
+    const allowedStrategies = [mockStrategy.target];
+
     managedVault = await ManagedVault.deploy(
         mockToken.target,          // underlying ERC20 token
         "TestVault",               // vault ERC20 name
         "TVLT",                    // vault ERC20 symbol
-        deployer.address           // owner
+        deployer.address,           // owner
+        allowedStrategies     // immutable whitelist
     );
 
     expect(await managedVault.totalAssets()).to.equal(0);

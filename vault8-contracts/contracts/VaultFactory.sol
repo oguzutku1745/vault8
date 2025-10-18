@@ -18,10 +18,17 @@ contract VaultFactory {
     function deployVault(
         address token,
         string memory name,
-        string memory symbol
+        string memory symbol,
+        address[] calldata allowedStrategies   // new parameter
     ) external returns (address vaultAddress) {
         // Deploy a new ManagedVault instance with the caller as owner
-        ManagedVault vault = new ManagedVault(IERC20(token), name, symbol, msg.sender);
+        ManagedVault vault = new ManagedVault(
+            IERC20(token),
+            name,
+            symbol,
+            msg.sender,           // owner
+            allowedStrategies     // immutable whitelist
+        );
 
         // Store the deployed vault address
         allVaults.push(address(vault));
@@ -31,6 +38,7 @@ contract VaultFactory {
 
         return address(vault);
     }
+
 
     /// @notice Return total number of vaults deployed
     function vaultCount() external view returns (uint256) {
