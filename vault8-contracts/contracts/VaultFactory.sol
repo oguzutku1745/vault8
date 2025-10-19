@@ -2,43 +2,56 @@
 pragma solidity ^0.8.20;
 
 import "./ManagedVault.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract VaultFactory {
+contract VaultFactory is Ownable {
     // List of all vaults deployed by this factory
     address[] public allVaults;
 
-    // Event emitted when a new vault is created
+    // Mapping of globally approved strategy contracts
+    mapping(address => bool) public approvedStrategies;
+
+    // Events
     event VaultCreated(address indexed vault, address indexed owner, address indexed token);
+    event StrategyApproved(address indexed strategy);
+
+    constructor() Ownable(msg.sender) {} //set the owner to deployer
+
+    /// @notice Approve a new strategy globally for vault creation
+    function approveStrategy(address strategy) external onlyOwner {
+        require(strategy != address(0), "VaultFactory: zero address");
+        approvedStrategies[strategy] = true;
+        emit StrategyApproved(strategy);
+    }
 
     /// @notice Deploy a new ManagedVault
-    /// @param token The ERC20 token the vault will hold
-    /// @param name The name of the vault token
-    /// @param symbol The symbol of the vault token
-    /// @return vaultAddress The address of the newly deployed vault
     function deployVault(
         address token,
         string memory name,
         string memory symbol,
-        address[] calldata allowedStrategies   // new parameter
+        address[] calldata allowedStrategies
     ) external returns (address vaultAddress) {
-        // Deploy a new ManagedVault instance with the caller as owner
+        // Verify all strategies are approved
+        for (uint256 i = 0; i < allowedStrategies.length; ++i) {
+            require(
+                approvedStrategies[allowedStrategies[i]],
+                "VaultFactory: unapproved strategy"
+            );
+        }
+
         ManagedVault vault = new ManagedVault(
             IERC20(token),
             name,
             symbol,
-            msg.sender,           // owner
-            allowedStrategies     // immutable whitelist
+            msg.sender,
+            allowedStrategies
         );
 
-        // Store the deployed vault address
         allVaults.push(address(vault));
-
-        // Emit event
         emit VaultCreated(address(vault), msg.sender, token);
 
         return address(vault);
     }
-
 
     /// @notice Return total number of vaults deployed
     function vaultCount() external view returns (uint256) {

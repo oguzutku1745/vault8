@@ -17,11 +17,12 @@ describe("VaultFactory & ManagedVault Integration", function () {
     const MockStrategy = await ethers.getContractFactory("MockStrategy");
     mockStrategy = await MockStrategy.deploy(mockToken.target);
 
-    // Deploy factory
     const VaultFactory = await ethers.getContractFactory("VaultFactory");
     factory = await VaultFactory.deploy();
 
-    // Deploy a vault via factory with whitelist
+    // <-- ensure the strategy is approved before deploying the vault
+    await factory.approveStrategy(mockStrategy.target);
+
     const allowedStrategies = [mockStrategy.target];
     const tx = await factory.deployVault(
       mockToken.target,

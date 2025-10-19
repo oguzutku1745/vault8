@@ -16,6 +16,7 @@ contract ManagedVault is ERC4626, Ownable {
 
     address[] private _allowedStrategies;            // ordered list for enumeration
     mapping(address => bool) private _isAllowedStrategy; // quick lookup for checks
+    mapping(address => uint256) public strategyBalances; // tracking strategy balances
 
     constructor(
         IERC20 asset_,
@@ -50,6 +51,7 @@ contract ManagedVault is ERC4626, Ownable {
         SafeERC20.forceApprove(vaultToken, address(strategy), amount);
         strategy.deposit(amount);
 
+        strategyBalances[address(strategy)] += amount;
         investedAssets += amount;
     }
 
@@ -62,18 +64,38 @@ contract ManagedVault is ERC4626, Ownable {
         // Withdraw from strategy to this vault
         strategy.withdraw(amount, address(this));
 
+        strategyBalances[address(strategy)] -= amount;
         investedAssets -= amount;
     }
 
 
-    /// @notice Returns total assets: free in vault + invested in strategies
+    // dynamic totalAssets(), we can also use investedAssets but this is more accurate. 
     function totalAssets() public view override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this)) + investedAssets;
+        uint256 total = IERC20(asset()).balanceOf(address(this));
+
+        for (uint256 i = 0; i < _allowedStrategies.length; ++i) {
+            IStrategy strategy = IStrategy(_allowedStrategies[i]);
+            total += strategy.balance();
+        }
+        return total;
     }
 
+    /// @notice Returns total internally tracked allocation across all strategies
+    function totalAllocation() external view returns (uint256) {
+        return investedAssets;
+    }
+
+
+    // dynamic, calls the strategy address for the current balance
     function strategyBalance(IStrategy strategy) external view returns (uint256) {
         return strategy.balance();
     }
+
+    // the allocated balance which is updated only when allocating and recalling assets from a strategy.
+    function strategyAllocation(address strategy) external view returns (uint256) {
+        return strategyBalances[strategy];
+    }
+
 
     /// @notice Check if a strategy is allowed
     function isStrategyAllowed(address strategy) public view returns (bool) {
@@ -85,4 +107,17 @@ contract ManagedVault is ERC4626, Ownable {
         return _allowedStrategies;
     }
 
+    /// @notice Reconcile internal accounting with actual strategy balances //CHECK
+    function syncInvestedAssets() external onlyOwner {
+        uint256 total = 0;
+
+        for (uint256 i = 0; i < _allowedStrategies.length; ++i) {
+            address strat = _allowedStrategies[i];
+            uint256 actual = IStrategy(strat).balance();
+            strategyBalances[strat] = actual; // update ledger
+            total += actual;
+        }
+
+        investedAssets = total;
+    }
 }
