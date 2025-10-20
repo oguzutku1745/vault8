@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStrategy} from "./IStrategy.sol";
+import {IStrategy4626Adapter} from "./StrategyAdapterERC4626.sol";
 
 contract ManagedVault is ERC4626, Ownable {
     using SafeERC20 for IERC20;
@@ -50,6 +51,16 @@ contract ManagedVault is ERC4626, Ownable {
         // Approve and deposit into strategy
         SafeERC20.forceApprove(vaultToken, address(strategy), amount);
         strategy.deposit(amount);
+
+        //PROBABLY BETTER WAY TO DO THIS
+        //CHECK
+        try IStrategy4626Adapter(address(strategy)).target() returns (address shareToken) {
+        // Give adapter permission to burn our ERC4626 shares for future recalls
+        IERC20(shareToken).approve(address(strategy), type(uint256).max);
+        } catch {
+            // non-ERC4626 adapters ignore
+        }
+
 
         strategyBalances[address(strategy)] += amount;
         investedAssets += amount;

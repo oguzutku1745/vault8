@@ -8,79 +8,69 @@ describe("VaultFactory & ManagedVault Integration", function () {
   beforeEach(async function () {
     [deployer, user] = await ethers.getSigners();
 
-    // Deploy mock token and mint
     const MockToken = await ethers.getContractFactory("MockERC20");
     mockToken = await MockToken.deploy("MockToken", "MTK");
     await mockToken.mint(deployer.address, ethers.parseUnits("1000", 18));
 
-    // Deploy mock strategy
     const MockStrategy = await ethers.getContractFactory("MockStrategy");
     mockStrategy = await MockStrategy.deploy(mockToken.target);
 
     const VaultFactory = await ethers.getContractFactory("VaultFactory");
-    factory = await VaultFactory.deploy();
-
-    // <-- ensure the strategy is approved before deploying the vault
+    factory = await VaultFactory.deploy(deployer.address);
     await factory.approveStrategy(mockStrategy.target);
 
-    const allowedStrategies = [mockStrategy.target];
     const tx = await factory.deployVault(
       mockToken.target,
       "TestVault",
       "TVLT",
-      allowedStrategies
+      deployer.address,
+      [mockStrategy.target]
     );
     const receipt = await tx.wait();
-    const event = receipt.logs.find(log => log.fragment?.name === "VaultCreated");
+    const event = receipt.logs.find(log => log.fragment?.name === "VaultDeployed");
     managedVault = await ethers.getContractAt("ManagedVault", event.args.vault);
 
-    // Transfer tokens to vault for testing
     await mockToken.transfer(managedVault.target, ethers.parseUnits("500", 18));
   });
 
-  // -----------------------------------------------------------------------
-  // Factory behavior
-  // -----------------------------------------------------------------------
-
-  it("deploys a ManagedVault with correct configuration", async function () {
+  it("deploys a ManagedVault with correct configuration", async () => {
     expect(await managedVault.name()).to.equal("TestVault");
     expect(await managedVault.symbol()).to.equal("TVLT");
     expect(await managedVault.owner()).to.equal(deployer.address);
     expect(await managedVault.asset()).to.equal(mockToken.target);
-    expect(await managedVault.isStrategyAllowed(mockStrategy.target)).to.equal(true);
+    expect(await managedVault.isStrategyAllowed(mockStrategy.target)).to.be.true;
   });
 
-  it("tracks deployed vaults and counts them correctly", async function () {
-    expect(await factory.vaultCount()).to.equal(1);
+  it("tracks deployed vaults and counts them correctly", async () => {
+    expect(await factory.allVaultsLength()).to.equal(1n);
     const firstVault = await factory.allVaults(0);
     expect(firstVault).to.properAddress;
   });
 
-  it("emits VaultCreated event on deployment", async function () {
-    const allowedStrategies = [mockStrategy.target];
+  it("emits VaultDeployed event on deployment", async () => {
     const tx = await factory.deployVault(
-      mockToken.target, "VaultEvent", "VLT", allowedStrategies
+      mockToken.target,
+      "VaultEvent",
+      "VLT",
+      deployer.address,
+      [mockStrategy.target]
     );
     const receipt = await tx.wait();
-    const ev = receipt.logs.find(log => log.fragment?.name === "VaultCreated");
+    const ev = receipt.logs.find(log => log.fragment?.name === "VaultDeployed");
 
     expect(ev).to.not.be.undefined;
     expect(ev.args.owner).to.equal(deployer.address);
-    expect(ev.args.token).to.equal(mockToken.target);
+    expect(ev.args.asset).to.equal(mockToken.target);
     expect(ev.args.vault).to.properAddress;
   });
 
-  // -----------------------------------------------------------------------
-  // Vault whitelist behavior
-  // -----------------------------------------------------------------------
-
-  it("stores allowed strategies immutably", async function () {
-    expect(await managedVault.isStrategyAllowed(mockStrategy.target)).to.equal(true);
-    expect(await managedVault.isStrategyAllowed(user.address)).to.equal(false);
+  it("stores allowed strategies immutably", async () => {
+    expect(await managedVault.isStrategyAllowed(mockStrategy.target)).to.be.true;
+    expect(await managedVault.isStrategyAllowed(user.address)).to.be.false;
     expect(await managedVault.allowedStrategies()).to.deep.equal([mockStrategy.target]);
   });
 
-  it("reverts allocate and recall if strategy is not allowed", async function () {
+  it("reverts allocate and recall if strategy is not allowed", async () => {
     const MockStrategy = await ethers.getContractFactory("MockStrategy");
     const otherStrategy = await MockStrategy.deploy(mockToken.target);
 
@@ -93,7 +83,7 @@ describe("VaultFactory & ManagedVault Integration", function () {
     ).to.be.reverted;
   });
 
-  it("restricts allocate and recall to owner only", async function () {
+  it("restricts allocate and recall to owner only", async () => {
     await expect(
       managedVault.connect(user).allocate(ethers.parseUnits("1", 18), mockStrategy.target)
     ).to.be.reverted;
@@ -104,7 +94,7 @@ describe("VaultFactory & ManagedVault Integration", function () {
     ).to.be.reverted;
   });
 
-  it("reverts constructor on zero-address strategy", async function () {
+  it("reverts constructor on zero-address strategy", async () => {
     const ManagedVault = await ethers.getContractFactory("ManagedVault");
     await expect(
       ManagedVault.deploy(
@@ -117,11 +107,7 @@ describe("VaultFactory & ManagedVault Integration", function () {
     ).to.be.revertedWith("ManagedVault: zero-strategy");
   });
 
-  // -----------------------------------------------------------------------
-  // End-to-end behavior
-  // -----------------------------------------------------------------------
-
-  it("enforces whitelist during allocate and recall", async function () {
+  it("enforces whitelist during allocate and recall", async () => {
     const amount = ethers.parseUnits("300", 18);
     const recallAmount = ethers.parseUnits("150", 18);
 
