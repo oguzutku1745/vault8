@@ -7,6 +7,7 @@
  */
 
 export * from './initStore';
+export * from './initStoreAtas';
 export * from './lzReceive';
 export * from './lzReceiveTypes';
 export * from './lzReceiveTypesInfo';
