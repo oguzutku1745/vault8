@@ -1,0 +1,40 @@
+WARNING: You are currently using Node.js v18.20.8, which is not supported by Hardhat. This can lead to unexpected behavior. See https://hardhat.org/nodejs-versions
+
+
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+[32minfo[39m:    Using Solana keypair from SOLANA_KEYPAIR_PATH (/Users/ouyildiz/.config/solana/id.json) => 55YLRrDxcLA4HLvLYjdvaeXAH2JUix2mjw1be8DpjM86
+
+    ╭─────────────────────────────────────────╮
+    │       ▓▓▓ LayerZero DevTools ▓▓▓        │
+    │  ═══════════════════════════════════    │
+    │          /*\                            │
+    │         /* *\     BUILD ANYTHING        │
+    │         ('v')                           │
+    │        //-=-\\    ▶ OMNICHAIN           │
+    │        (\_=_/)                          │
+    │         ^^ ^^                           │
+    │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  │
+    ╰─────────────────────────────────────────╯
+
+[32minfo[39m:    [OApp] Checking OApp configuration
+[32minfo[39m:    [OApp] Checking OApp peers configuration
+[32minfo[39m:    [OApp] ✓ Checked OApp peers configuration
+[32minfo[39m:    [OApp] Checking send libraries configuration
+[32minfo[39m:    [OApp] ✓ Checked send libraries configuration
+[32minfo[39m:    [OApp] Checking receive libraries configuration
+[32minfo[39m:    [OApp] ✓ Checked receive libraries configuration
+[32minfo[39m:    [OApp] Checking receive library timeout configuration
+[32minfo[39m:    [OApp] ✓ Checked receive library timeout configuration
+[32minfo[39m:    [OApp] Checking send configuration
+[32minfo[39m:    [OApp] ✓ Checked send configuration
+[32minfo[39m:    [OApp] Checking receive configuration
+[32minfo[39m:    [OApp] ✓ Checked receive configuration
+[32minfo[39m:    [OApp] Checking enforced options
+[32minfo[39m:    [OApp] ✓ Checked enforced options
+[32minfo[39m:    [OApp] Checking OApp callerBpsCap configuration
+[32minfo[39m:    [OApp] ✓ Checked OApp callerBpsCap configuration
+[32minfo[39m:    [OApp] Checking OApp delegates configuration
+[32minfo[39m:    [OApp] ✓ Checked OApp delegates
+[32minfo[39m:    [OApp] ✓ Checked OApp configuration
+[32minfo[39m:    There are 7 transactions required to configure the OApp
+[?25l[2K[1G? Would you like to preview the transactions before continuing? › (Y/n)

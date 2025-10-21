@@ -10,9 +10,7 @@ pub struct InitStore<'info> {
         init,
         payer = payer,
         space = Store::SIZE,
-        seeds = [STORE_SEED], // You can namespace this further if your program manages multiple stores.
-        // e.g. If there can be a store for each user, you can use something like:
-        // seeds = [STORE_SEED, &user.key().as_ref()]
+        seeds = [STORE_SEED],
         bump
     )]
     pub store: Account<'info, Store>,
@@ -35,11 +33,6 @@ impl InitStore<'_> {
         ctx.accounts.store.admin = params.admin;
         ctx.accounts.store.bump = ctx.bumps.store;
         ctx.accounts.store.endpoint_program = params.endpoint;
-        ctx.accounts.lz_receive_types_accounts.store = ctx.accounts.store.key();
-        // the above lines are required for all OApp implementations
-
-        // the line below is specific to this string-passing example
-        ctx.accounts.store.string = "Nothing received yet.".to_string();
 
         // Prepare the delegate address for the OApp registration.
         let register_params = RegisterOAppParams { delegate: ctx.accounts.store.admin };
@@ -53,6 +46,9 @@ impl InitStore<'_> {
             seeds,
             register_params,
         )?;
+
+        // Initialize types PDA for SDK discovery
+        ctx.accounts.lz_receive_types_accounts.store = ctx.accounts.store.key();
 
         Ok(())
     }

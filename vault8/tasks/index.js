@@ -2,8 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 require("./common/wire");
 require("./common/send");
+require("./common/sendAmount");
 require("./common/oappGet");
 require("./solana/oappCreate");
 require("./solana/initConfig");
+require("./solana/forceInitConfig");
+require("./solana/forceSetPeer");
+require("./solana/forceInitLibraries");
+require("./solana/setJlConfig");
 require("./solana/retryMessage");
 require("./solana/debug");
+require("./common/debugTx");

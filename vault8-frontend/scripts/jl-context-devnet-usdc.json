@@ -1,0 +1,19 @@
+{
+  "lendingAdmin": "DeF2BVMjWdCamK71nqBZ7uzQkLeW9MJ6C7zoCKLJXEmW",
+  "lending": "98Uy7eonumvRbhQvP5Jt7B3WjNqpndioMF99xvR7sDVa",
+  "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "fTokenMint": "2Wx1tTo8PkTP95NyKoFNPTtcLnYaSowDkExwbHDKAZQu",
+  "supplyTokenReservesLiquidity": "644Eh222dNe1V6sSRkYHBcdpxfjtxBBptAJ6mZujRRNo",
+  "lendingSupplyPositionOnLiquidity": "B5JAZXGKaZfWsUrauprZVNQM7HwXN8AfKVTt25qtDKYV",
+  "rateModel": "CpSRFppSpkdPw7juvRpSxwVyZMN3y8g7cHXCbrc3MBUs",
+  "vault": "CWFPa1gcDqGyeTHTmdbhGjCnQv7eRfdhnBpZKFzNr1R2",
+  "liquidity": "DFHSbFzMU67yHK9yLsLBLso7aEnzrB4ZQR7KBujmSU3M",
+  "liquidityProgram": "5uDkCoM96pwGYhAUucvCzLfm5UcjVRuxz6gH81RnRBmL",
+  "lendingProgram": "7tjE28izRUjzmxC1QNXnNwcc4N82CNYCexf3k8mw67s3",
+  "rewardsRateModel": "GGtryeuwjcWoG6zg4Xi1vUJN1xRhypms4xt129BKTUxt",
+  "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "associatedTokenProgram": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  "systemProgram": "11111111111111111111111111111111",
+  "sysvarInstruction": "Sysvar1nstructions1111111111111111111111111",
+  "usdcMint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+}
