@@ -32,6 +32,7 @@ export type InitStoreInstructionAccounts = {
   payer?: Signer;
   store: PublicKey | Pda;
   lzReceiveTypesAccounts: PublicKey | Pda;
+  alt?: PublicKey | Pda;
   systemProgram?: PublicKey | Pda;
 };
 
@@ -102,8 +103,9 @@ export function initStore(
       isWritable: true as boolean,
       value: input.lzReceiveTypesAccounts ?? null,
     },
+    alt: { index: 3, isWritable: false as boolean, value: input.alt ?? null },
     systemProgram: {
-      index: 3,
+      index: 4,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },

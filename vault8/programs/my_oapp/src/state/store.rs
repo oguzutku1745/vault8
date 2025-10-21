@@ -32,12 +32,15 @@ impl Store {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct LzReceiveTypesAccounts {
-    pub store: Pubkey,
+    pub store: Pubkey, // OApp address
+    pub alt: Pubkey,   // Address Lookup Table for Jupiter Lend accounts
+    pub bump: u8,
 }
 
 impl LzReceiveTypesAccounts {
-    pub const SIZE: usize = 8 + std::mem::size_of::<Self>();
+    pub const SIZE: usize = 8 + LzReceiveTypesAccounts::INIT_SPACE;
 }
 
 
