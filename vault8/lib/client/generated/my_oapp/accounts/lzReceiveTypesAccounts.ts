@@ -25,6 +25,7 @@ import {
   mapSerializer,
   publicKey as publicKeySerializer,
   struct,
+  u8,
 } from '@metaplex-foundation/umi/serializers';
 
 export type LzReceiveTypesAccounts = Account<LzReceiveTypesAccountsAccountData>;
@@ -32,9 +33,15 @@ export type LzReceiveTypesAccounts = Account<LzReceiveTypesAccountsAccountData>;
 export type LzReceiveTypesAccountsAccountData = {
   discriminator: Uint8Array;
   store: PublicKey;
+  alt: PublicKey;
+  bump: number;
 };
 
-export type LzReceiveTypesAccountsAccountDataArgs = { store: PublicKey };
+export type LzReceiveTypesAccountsAccountDataArgs = {
+  store: PublicKey;
+  alt: PublicKey;
+  bump: number;
+};
 
 export function getLzReceiveTypesAccountsAccountDataSerializer(): Serializer<
   LzReceiveTypesAccountsAccountDataArgs,
@@ -49,6 +56,8 @@ export function getLzReceiveTypesAccountsAccountDataSerializer(): Serializer<
       [
         ['discriminator', bytes({ size: 8 })],
         ['store', publicKeySerializer()],
+        ['alt', publicKeySerializer()],
+        ['bump', u8()],
       ],
       { description: 'LzReceiveTypesAccountsAccountData' }
     ),
@@ -137,9 +146,16 @@ export function getLzReceiveTypesAccountsGpaBuilder(
     'HFyiETGKEUS9tr87K1HXmVJHkqQRtw8wShRNTMkKKxay'
   );
   return gpaBuilder(context, programId)
-    .registerFields<{ discriminator: Uint8Array; store: PublicKey }>({
+    .registerFields<{
+      discriminator: Uint8Array;
+      store: PublicKey;
+      alt: PublicKey;
+      bump: number;
+    }>({
       discriminator: [0, bytes({ size: 8 })],
       store: [8, publicKeySerializer()],
+      alt: [40, publicKeySerializer()],
+      bump: [72, u8()],
     })
     .deserializeUsing<LzReceiveTypesAccounts>((account) =>
       deserializeLzReceiveTypesAccounts(account)
@@ -151,5 +167,5 @@ export function getLzReceiveTypesAccountsGpaBuilder(
 }
 
 export function getLzReceiveTypesAccountsSize(): number {
-  return 40;
+  return 73;
 }

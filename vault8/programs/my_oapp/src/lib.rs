@@ -8,6 +8,7 @@ use instructions::*;
 use oapp::{
     endpoint::MessagingFee,
     endpoint_cpi::LzAccount,
+    lz_receive_types_v2::{LzReceiveTypesV2Accounts, LzReceiveTypesV2Result},
     LzReceiveParams,
 };
 use solana_helper::program_id_from_env;
@@ -61,7 +62,7 @@ pub mod my_oapp {
         LzReceive::apply(&mut ctx, &params)
     }
 
-    // handler that returns the list of accounts required to execute lz_receive
+    // handler that returns the list of accounts required to execute lz_receive (V1)
     pub fn lz_receive_types(
         ctx: Context<LzReceiveTypes>,
         params: LzReceiveParams,
@@ -69,11 +70,29 @@ pub mod my_oapp {
         LzReceiveTypes::apply(&ctx, &params)
     }
 
-    // handler that returns metadata about which accounts are needed to call lz_receive_types
-    // Remove v2 info endpoint per user's request; discovery handled by V1 PDA
+    // V2 handler that returns version and versioned data for LzReceiveTypes
+    pub fn lz_receive_types_info(
+        ctx: Context<LzReceiveTypesInfo>,
+        params: LzReceiveParams,
+    ) -> Result<(u8, LzReceiveTypesV2Accounts)> {
+        LzReceiveTypesInfo::apply(&ctx, &params)
+    }
+
+    // V2 handler that returns the execution plan with ALT-compressed accounts
+    pub fn lz_receive_types_v2(
+        ctx: Context<LzReceiveTypesV2>,
+        params: LzReceiveParams,
+    ) -> Result<LzReceiveTypesV2Result> {
+        LzReceiveTypesV2::apply(&ctx, &params)
+    }
 
     // Admin method to set Jupiter Lend configuration and SPL programs
     pub fn set_jl_config(mut ctx: Context<SetJlConfig>, params: SetJlConfigParams) -> Result<()> {
         SetJlConfig::apply(&mut ctx, params)
+    }
+
+    // Admin method to set Address Lookup Table for V2
+    pub fn set_alt(mut ctx: Context<SetAlt>) -> Result<()> {
+        SetAlt::apply(&mut ctx)
     }
 }

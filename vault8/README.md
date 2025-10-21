@@ -307,3 +307,7 @@ pnpm test
 <p align="center">
   Join our <a href="https://layerzero.network/community" style="color: #a77dff">community</a>! | Follow us on <a href="https://x.com/LayerZero_Labs" style="color: #a77dff">X (formerly Twitter)</a>
 </p>
+
+
+Proof of succesfull message + jup deposit:
+https://testnet.layerzeroscan.com/tx/0xe7485eecbd75c22fa051a9d98a966aa542d9942f0c0ba2ac22847c44fa8f92aa
