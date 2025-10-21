@@ -31,6 +31,7 @@ impl Store {
     pub const SIZE: usize = 8 + 32 + 1 + 32 + (4 * 32) + (11 * 32);
 }
 
+/// LzReceiveTypesAccounts for V2 - REQUIRED by Executor
 #[account]
 #[derive(InitSpace)]
 pub struct LzReceiveTypesAccounts {
@@ -41,6 +42,23 @@ pub struct LzReceiveTypesAccounts {
 
 impl LzReceiveTypesAccounts {
     pub const SIZE: usize = 8 + LzReceiveTypesAccounts::INIT_SPACE;
+}
+
+/// UserBalance tracks cumulative deposits/withdrawals for each EVM user
+#[account]
+#[derive(InitSpace)]
+pub struct UserBalance {
+    pub evm_address: [u8; 20],     // 20-byte EVM address
+    pub total_deposited: u64,      // Cumulative deposits (base units)
+    pub total_withdrawn: u64,      // Cumulative withdrawals (future)
+    pub ftoken_balance: u64,       // Current fToken balance from JL
+    pub last_updated: i64,         // Last activity timestamp
+    pub deposit_count: u32,        // Number of deposits
+    pub bump: u8,
+}
+
+impl UserBalance {
+    pub const SIZE: usize = 8 + UserBalance::INIT_SPACE;
 }
 
 

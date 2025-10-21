@@ -61,4 +61,3 @@ impl LzReceiveTypesInfo<'_> {
         Ok((LZ_RECEIVE_TYPES_VERSION, LzReceiveTypesV2Accounts { accounts: required_accounts }))
     }
 }
-

@@ -28,4 +28,3 @@ impl SetAlt<'_> {
         Ok(())
     }
 }
-

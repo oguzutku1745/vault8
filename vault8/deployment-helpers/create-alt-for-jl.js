@@ -46,9 +46,12 @@ async function main() {
   jlAccounts.forEach((acc, i) => console.log(`  ${i + 1}. ${acc.toBase58()}`));
 
   const connection = new Connection(RPC_URL, 'confirmed');
+  
+  // Get latest blockhash and slot TOGETHER to ensure they're recent
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const slot = await connection.getSlot();
 
-  // Create ALT
+  // Create ALT with the fresh slot
   const [createIx, altAddress] = AddressLookupTableProgram.createLookupTable({
     authority: payer.publicKey,
     payer: payer.publicKey,
@@ -64,9 +67,6 @@ async function main() {
     payer: payer.publicKey,
     addresses: jlAccounts,
   });
-
-  // Build and send transaction
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: blockhash,

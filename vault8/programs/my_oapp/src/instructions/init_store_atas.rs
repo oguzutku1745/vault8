@@ -23,6 +23,12 @@ pub struct InitStoreAtas<'info> {
     #[account(mut)]
     pub store_ftoken_ata: UncheckedAccount<'info>,
     
+    /// CHECK: USDC mint (from Store config)
+    pub usdc_mint: UncheckedAccount<'info>,
+    
+    /// CHECK: fToken mint (from Store config)
+    pub ftoken_mint: UncheckedAccount<'info>,
+    
     /// CHECK: Token program
     pub token_program: UncheckedAccount<'info>,
     
@@ -90,6 +96,7 @@ impl InitStoreAtas<'_> {
                     ctx.accounts.payer.to_account_info(),
                     ctx.accounts.store_usdc_ata.to_account_info(),
                     ctx.accounts.store.to_account_info(),
+                    ctx.accounts.usdc_mint.to_account_info(),
                     ctx.accounts.system_program.to_account_info(),
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.associated_token_program.to_account_info(),
@@ -118,6 +125,7 @@ impl InitStoreAtas<'_> {
                     ctx.accounts.payer.to_account_info(),
                     ctx.accounts.store_ftoken_ata.to_account_info(),
                     ctx.accounts.store.to_account_info(),
+                    ctx.accounts.ftoken_mint.to_account_info(),
                     ctx.accounts.system_program.to_account_info(),
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.associated_token_program.to_account_info(),

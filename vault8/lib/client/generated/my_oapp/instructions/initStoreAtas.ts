@@ -32,6 +32,8 @@ export type InitStoreAtasInstructionAccounts = {
   store: PublicKey | Pda;
   storeUsdcAta: PublicKey | Pda;
   storeFtokenAta: PublicKey | Pda;
+  usdcMint: PublicKey | Pda;
+  ftokenMint: PublicKey | Pda;
   tokenProgram?: PublicKey | Pda;
   associatedTokenProgram: PublicKey | Pda;
   systemProgram?: PublicKey | Pda;
@@ -98,18 +100,28 @@ export function initStoreAtas(
       isWritable: true as boolean,
       value: input.storeFtokenAta ?? null,
     },
-    tokenProgram: {
+    usdcMint: {
       index: 4,
+      isWritable: false as boolean,
+      value: input.usdcMint ?? null,
+    },
+    ftokenMint: {
+      index: 5,
+      isWritable: false as boolean,
+      value: input.ftokenMint ?? null,
+    },
+    tokenProgram: {
+      index: 6,
       isWritable: false as boolean,
       value: input.tokenProgram ?? null,
     },
     associatedTokenProgram: {
-      index: 5,
+      index: 7,
       isWritable: false as boolean,
       value: input.associatedTokenProgram ?? null,
     },
     systemProgram: {
-      index: 6,
+      index: 8,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },

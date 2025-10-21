@@ -10,6 +10,7 @@ import {
   Context,
   Pda,
   PublicKey,
+  Signer,
   TransactionBuilder,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
@@ -41,6 +42,15 @@ export type LzReceiveInstructionAccounts = {
   store: PublicKey | Pda;
   /** Peer config PDA for the sending chain. Ensures `params.sender` can only be the allowed peer from that remote chain. */
   peer: PublicKey | Pda;
+  /**
+   * UserBalance PDA tracking this EVM user's deposits
+   * Seeds derived from EVM address parsed from message
+   */
+
+  userBalance: PublicKey | Pda;
+  /** Payer for UserBalance PDA creation (Executor) */
+  payer?: Signer;
+  systemProgram?: PublicKey | Pda;
 };
 
 // Data.
@@ -79,7 +89,7 @@ export type LzReceiveInstructionArgs = LzReceiveInstructionDataArgs;
 
 // Instruction.
 export function lzReceive(
-  context: Pick<Context, 'programs'>,
+  context: Pick<Context, 'payer' | 'programs'>,
   input: LzReceiveInstructionAccounts & LzReceiveInstructionArgs
 ): TransactionBuilder {
   // Program ID.
@@ -96,10 +106,37 @@ export function lzReceive(
       value: input.store ?? null,
     },
     peer: { index: 1, isWritable: false as boolean, value: input.peer ?? null },
+    userBalance: {
+      index: 2,
+      isWritable: true as boolean,
+      value: input.userBalance ?? null,
+    },
+    payer: {
+      index: 3,
+      isWritable: true as boolean,
+      value: input.payer ?? null,
+    },
+    systemProgram: {
+      index: 4,
+      isWritable: false as boolean,
+      value: input.systemProgram ?? null,
+    },
   } satisfies ResolvedAccountsWithIndices;
 
   // Arguments.
   const resolvedArgs: LzReceiveInstructionArgs = { ...input };
+
+  // Default values.
+  if (!resolvedAccounts.payer.value) {
+    resolvedAccounts.payer.value = context.payer;
+  }
+  if (!resolvedAccounts.systemProgram.value) {
+    resolvedAccounts.systemProgram.value = context.programs.getPublicKey(
+      'splSystem',
+      '11111111111111111111111111111111'
+    );
+    resolvedAccounts.systemProgram.isWritable = false;
+  }
 
   // Accounts in order.
   const orderedAccounts: ResolvedAccount[] = Object.values(

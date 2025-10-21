@@ -1,6 +1,15 @@
 use crate::*;
+use crate::errors::MyOAppError;
 use oapp::endpoint_cpi::{get_accounts_for_clear, LzAccount};
 use oapp::{endpoint::ID as ENDPOINT_ID, LzReceiveParams};
+
+/// Helper to parse EVM address from message
+fn parse_evm_address(message: &[u8]) -> Result<[u8; 20]> {
+    require!(message.len() >= 28, MyOAppError::InvalidMessageType);
+    let mut evm_address = [0u8; 20];
+    evm_address.copy_from_slice(&message[8..28]);
+    Ok(evm_address)
+}
 
 /// `lz_receive_types` is queried off-chain by the Executor before calling
 /// `lz_receive`. It must return **every** account that will be touched by the
@@ -29,12 +38,25 @@ impl LzReceiveTypes<'_> {
         let peer_seeds = [PEER_SEED, &store.to_bytes(), &params.src_eid.to_be_bytes()];
         let (peer, _) = Pubkey::find_program_address(&peer_seeds, ctx.program_id);
 
+        // Parse EVM address from message to derive UserBalance PDA
+        let evm_address = parse_evm_address(&params.message)?;
+        let (user_balance_pda, _) = Pubkey::find_program_address(
+            &[USER_BALANCE_SEED, &evm_address],
+            ctx.program_id,
+        );
+
         // Accounts used directly by `lz_receive`
         let mut accounts = vec![
             // store (mutable)
             LzAccount { pubkey: store, is_signer: false, is_writable: true },
             // peer (read-only)
-            LzAccount { pubkey: peer, is_signer: false, is_writable: false }
+            LzAccount { pubkey: peer, is_signer: false, is_writable: false },
+            // UserBalance PDA (will be created if needed)
+            LzAccount { pubkey: user_balance_pda, is_signer: false, is_writable: true },
+            // Payer (Executor) - special sentinel value resolved by Executor
+            LzAccount { pubkey: Pubkey::default(), is_signer: true, is_writable: true },
+            // System program
+            LzAccount { pubkey: anchor_lang::solana_program::system_program::ID, is_signer: false, is_writable: false },
         ];
 
         // Append the additional accounts required for `Endpoint::clear`

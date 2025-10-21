@@ -26,6 +26,18 @@ declare_id!(anchor_lang::solana_program::pubkey::Pubkey::new_from_array(program_
 const STORE_SEED: &[u8] = b"Store";
 const PEER_SEED: &[u8] = b"Peer";
 const LZ_RECEIVE_TYPES_SEED: &[u8] = b"LzReceiveTypes";
+const USER_BALANCE_SEED: &[u8] = b"UserBalance";
+
+/// Event emitted for each deposit with GUID for bot indexing
+#[event]
+pub struct DepositEvent {
+    pub guid: [u8; 32],            // LayerZero message GUID
+    pub evm_address: [u8; 20],     // User's EVM address
+    pub amount: u64,               // Amount deposited (base units)
+    pub new_total: u64,            // Cumulative total after this deposit
+    pub deposit_index: u32,        // nth deposit for this user
+    pub timestamp: i64,            // Unix timestamp
+}
 
 #[program]
 pub mod my_oapp {

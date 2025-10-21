@@ -1,4 +1,5 @@
 use crate::*;
+use crate::errors::MyOAppError;
 use anchor_lang::solana_program;
 use oapp::{
     common::{
@@ -9,6 +10,14 @@ use oapp::{
     lz_receive_types_v2::{Instruction, LzReceiveTypesV2Result},
     LzReceiveParams,
 };
+
+/// Helper to parse EVM address from message
+fn parse_evm_address(message: &[u8]) -> Result<[u8; 20]> {
+    require!(message.len() >= 28, MyOAppError::InvalidMessageType);
+    let mut evm_address = [0u8; 20];
+    evm_address.copy_from_slice(&message[8..28]);
+    Ok(evm_address)
+}
 
 #[derive(Accounts)]
 #[instruction(params: LzReceiveParams)]
@@ -29,11 +38,24 @@ impl LzReceiveTypesV2<'_> {
         let peer_seeds = [PEER_SEED, &store.to_bytes(), &params.src_eid.to_be_bytes()];
         let (peer, _) = Pubkey::find_program_address(&peer_seeds, ctx.program_id);
 
+        // Parse EVM address from message to derive UserBalance PDA
+        let evm_address = parse_evm_address(&params.message)?;
+        let (user_balance_pda, _) = Pubkey::find_program_address(
+            &[USER_BALANCE_SEED, &evm_address],
+            ctx.program_id,
+        );
+
         let mut accounts = vec![
             // store (mutable)
             AccountMetaRef { pubkey: store.into(), is_writable: true },
             // peer (read-only)
             AccountMetaRef { pubkey: peer.into(), is_writable: false },
+            // UserBalance PDA (will be created if needed)
+            AccountMetaRef { pubkey: user_balance_pda.into(), is_writable: true },
+            // Payer (Executor) - AddressLocator::Payer resolved by Executor
+            AccountMetaRef { pubkey: AddressLocator::Payer, is_writable: true },
+            // System program
+            AccountMetaRef { pubkey: anchor_lang::solana_program::system_program::ID.into(), is_writable: false },
         ];
 
         // Get clear accounts from Endpoint and convert to AccountMetaRef

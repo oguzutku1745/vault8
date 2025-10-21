@@ -4,8 +4,11 @@
 seeds = false
 skip-lint = false
 
+[programs.devnet]
+my_oapp = "67K1bWanFMMgCT2Yx6MhKZNk8ng6DiRCNVPNjqWe2WPL"
+
 [programs.localnet]
-my_oapp = "GE2w6km2W4egQwndscoK6udHkksXZAag3Lgzfw3eaquh"
+my_oapp = "AApBCUDXvRkTJ2kajN9xpLdT2MUTE6bDD883vPn6VU9R"
 
 [registry]
 url = "https://api.apr.dev"

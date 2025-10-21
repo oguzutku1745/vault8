@@ -19,7 +19,7 @@ const EVM_ENFORCED_OPTIONS: OAppEnforcedOption[] = [
     {
         msgType: 1,
         optionType: ExecutorOptionType.LZ_RECEIVE,
-        gas: 230_000, // Increased
+        gas: 800_000, // Compute units budget for Solana lzReceive + Jupiter Lend CPI
     },
     {
         msgType: 1,
@@ -34,7 +34,7 @@ const SOLANA_ENFORCED_OPTIONS: OAppEnforcedOption[] = [
     {
         msgType: 1,
         optionType: ExecutorOptionType.LZ_RECEIVE,
-        gas: 230_000, // Increased
+        gas: 800_000, // Compute units budget for Solana lzReceive + Jupiter Lend CPI
     },
 ]
 

@@ -28,6 +28,7 @@ import {
   u8,
 } from '@metaplex-foundation/umi/serializers';
 
+/** LzReceiveTypesAccounts for V2 - REQUIRED by Executor */
 export type LzReceiveTypesAccounts = Account<LzReceiveTypesAccountsAccountData>;
 
 export type LzReceiveTypesAccountsAccountData = {

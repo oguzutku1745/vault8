@@ -1,14 +1,24 @@
-// Set ALT in LzReceiveTypesAccounts for V2
+// Set ALT directly in Store for V2
 const { Connection, Keypair, PublicKey } = require('@solana/web3.js');
 const { Program, AnchorProvider, Wallet } = require('@coral-xyz/anchor');
 const fs = require('fs');
 const path = require('path');
 
 const RPC_URL = 'https://api.devnet.solana.com';
-const PROGRAM_ID = '6xiE44rs5ft5PAxfJv1Pq4iXvsLrGbmEo4FbS9eLTfHV';
-const ALT_ADDRESS = 'EseuZ8NLNVpnarbUQNxtxRRvD9cWCTAyhgZcSDJFy4RB';
 
 async function main() {
+  // Get ALT address from command line
+  const altAddress = process.argv[2];
+  if (!altAddress) {
+    console.error('Usage: node set-alt.js <ALT_ADDRESS>');
+    process.exit(1);
+  }
+
+  // Load program ID from deployment
+  const deploymentPath = path.join(__dirname, 'deployments/solana-testnet/OApp.json');
+  const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+  const PROGRAM_ID = deployment.programId;
+
   // Load admin keypair
   const keypath = path.join(process.env.HOME, '.config/solana/id.json');
   const admin = Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(keypath, 'utf8'))));
@@ -22,16 +32,19 @@ async function main() {
   const provider = new AnchorProvider(connection, new Wallet(admin), { commitment: 'confirmed' });
   const program = new Program(idl, PROGRAM_ID, provider);
 
-  // Derive PDAs
+  // Derive Store PDA
   const [store] = PublicKey.findProgramAddressSync([Buffer.from('Store')], program.programId);
+
+  // Derive LzReceiveTypesAccounts PDA (required for V2)
   const [lzReceiveTypesAccounts] = PublicKey.findProgramAddressSync(
     [Buffer.from('LzReceiveTypes'), store.toBuffer()],
     program.programId
   );
 
-  console.log(`\n📦 Store PDA: ${store.toBase58()}`);
+  console.log(`\n📦 Program ID: ${PROGRAM_ID}`);
+  console.log(`📦 Store PDA: ${store.toBase58()}`);
   console.log(`📦 LzReceiveTypesAccounts PDA: ${lzReceiveTypesAccounts.toBase58()}`);
-  console.log(`📍 Setting ALT to: ${ALT_ADDRESS}\n`);
+  console.log(`📍 Setting ALT to: ${altAddress}\n`);
 
   try {
     const tx = await program.methods
@@ -39,7 +52,7 @@ async function main() {
       .accounts({
         store,
         lzReceiveTypesAccounts,
-        alt: new PublicKey(ALT_ADDRESS),
+        alt: new PublicKey(altAddress),
         admin: admin.publicKey,
       })
       .rpc();
