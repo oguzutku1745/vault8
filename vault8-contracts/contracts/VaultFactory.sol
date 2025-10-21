@@ -2,38 +2,76 @@
 pragma solidity ^0.8.20;
 
 import "./ManagedVault.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract VaultFactory {
-    // List of all vaults deployed by this factory
+contract VaultFactory is Ownable {
+    // Global registry of approved strategy addresses
+    mapping(address => bool) public isApprovedStrategy;
+    address[] public approvedStrategiesList;
+
+    // Track all deployed vaults
     address[] public allVaults;
 
-    // Event emitted when a new vault is created
-    event VaultCreated(address indexed vault, address indexed owner, address indexed token);
+    event StrategyApproved(address indexed strategy);
+    event StrategyRevoked(address indexed strategy);
+    event VaultDeployed(address indexed vault, address indexed asset, address indexed owner);
 
-    /// @notice Deploy a new ManagedVault
-    /// @param token The ERC20 token the vault will hold
-    /// @param name The name of the vault token
-    /// @param symbol The symbol of the vault token
-    /// @return vaultAddress The address of the newly deployed vault
-    function deployVault(
-        address token,
-        string memory name,
-        string memory symbol
-    ) external returns (address vaultAddress) {
-        // Deploy a new ManagedVault instance with the caller as owner
-        ManagedVault vault = new ManagedVault(IERC20(token), name, symbol, msg.sender);
+    constructor(address owner_) Ownable(owner_) {}
 
-        // Store the deployed vault address
-        allVaults.push(address(vault));
-
-        // Emit event
-        emit VaultCreated(address(vault), msg.sender, token);
-
-        return address(vault);
+    // ---------------------------------------------------------------------
+    // Strategy registry management
+    // ---------------------------------------------------------------------
+    function approveStrategy(address strategy) external onlyOwner {
+        require(strategy != address(0), "VaultFactory: zero address");
+        require(!isApprovedStrategy[strategy], "VaultFactory: already approved");
+        isApprovedStrategy[strategy] = true;
+        approvedStrategiesList.push(strategy);
+        emit StrategyApproved(strategy);
     }
 
-    /// @notice Return total number of vaults deployed
-    function vaultCount() external view returns (uint256) {
+    function revokeStrategy(address strategy) external onlyOwner {
+        require(isApprovedStrategy[strategy], "VaultFactory: not approved");
+        isApprovedStrategy[strategy] = false;
+        emit StrategyRevoked(strategy);
+    }
+
+    function approvedStrategies() external view returns (address[] memory) {
+        return approvedStrategiesList;
+    }
+
+    // ---------------------------------------------------------------------
+    // Vault deployment
+    // ---------------------------------------------------------------------
+    function deployVault(
+        IERC20 asset,
+        string calldata name,
+        string calldata symbol,
+        address vaultOwner,
+        address[] calldata selectedStrategies
+    ) external onlyOwner returns (ManagedVault vault) {
+        require(vaultOwner != address(0), "VaultFactory: zero owner");
+        require(selectedStrategies.length > 0, "VaultFactory: no strategies selected");
+
+        // Validate each selected strategy is globally approved
+        for (uint256 i = 0; i < selectedStrategies.length; ++i) {
+            require(isApprovedStrategy[selectedStrategies[i]], "unapproved strategy");
+        }
+
+        vault = new ManagedVault(asset, name, symbol, vaultOwner, selectedStrategies);
+
+        allVaults.push(address(vault));
+        emit VaultDeployed(address(vault), address(asset), vaultOwner);
+    }
+
+    // ---------------------------------------------------------------------
+    // View helpers
+    // ---------------------------------------------------------------------
+    function allVaultsLength() external view returns (uint256) {
         return allVaults.length;
+    }
+
+    function getAllVaults() external view returns (address[] memory) {
+        return allVaults;
     }
 }
