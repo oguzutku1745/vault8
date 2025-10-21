@@ -16,6 +16,13 @@ import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
 import './tasks/index'
+// Ensure custom tasks are registered even if index aggregation is bypassed by tooling/caching
+import './tasks/common/sendAmount'
+import './tasks/solana/setJlConfig'
+import './tasks/solana/simulateReceive'
+import './tasks/solana/forceInitConfig'
+import './tasks/solana/forceSetPeer'
+import './tasks/solana/forceInitLibraries'
 
 // Set your preferred authentication method
 //

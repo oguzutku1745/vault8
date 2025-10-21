@@ -1,0 +1,7 @@
+Using image "backpackapp/build:v0.29.0"
+Run docker image
+docker: permission denied while trying to connect to the Docker daemon socket at unix:///Users/ouyildiz/.docker/run/docker.sock: Head "http://%2FUsers%2Fouyildiz%2F.docker%2Frun%2Fdocker.sock/_ping": dial unix /Users/ouyildiz/.docker/run/docker.sock: connect: operation not permitted
+
+Run 'docker run --help' for more information
+Error during Docker build: Failed to build program
+Error: Failed to build program

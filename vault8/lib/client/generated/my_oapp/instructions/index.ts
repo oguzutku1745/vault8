@@ -6,9 +6,10 @@
  * @see https://github.com/kinobi-so/kinobi
  */
 
-export * from './initStore'
-export * from './lzReceive'
-export * from './lzReceiveTypes'
-export * from './quoteSend'
-export * from './send'
-export * from './setPeerConfig'
+export * from './initStore';
+export * from './lzReceive';
+export * from './lzReceiveTypes';
+export * from './quoteSend';
+export * from './send';
+export * from './setJlConfig';
+export * from './setPeerConfig';

@@ -103,8 +103,6 @@ export class MyOApp {
                 {
                     payer,
                     store: oapp,
-                    lzReceiveTypesAccounts: this.pda.lzReceiveTypesAccounts()[0],
-
                     // args
                     admin: admin,
                     endpoint: this.endpointSDK.programId,

@@ -5,7 +5,11 @@ mod state;
 
 use anchor_lang::prelude::*;
 use instructions::*;
-use oapp::{endpoint::MessagingFee, endpoint_cpi::LzAccount, LzReceiveParams};
+use oapp::{
+    endpoint::MessagingFee,
+    endpoint_cpi::LzAccount,
+    LzReceiveParams,
+};
 use solana_helper::program_id_from_env;
 use state::*;
 
@@ -18,9 +22,9 @@ declare_id!(anchor_lang::solana_program::pubkey::Pubkey::new_from_array(program_
     "41NCdrEvXhQ4mZgyJkmqYxL6A1uEmnraGj31UJ6PsXd3" // It's not necessary to change the ID here if you are building using environment variable
 )));
 
-const LZ_RECEIVE_TYPES_SEED: &[u8] = b"LzReceiveTypes"; // The Executor relies on this exact seed to derive the LzReceiveTypes PDA. Keep it the same.
-const STORE_SEED: &[u8] = b"Store"; // You are free to edit this seed.
-const PEER_SEED: &[u8] = b"Peer"; // Not used by the Executor.
+const STORE_SEED: &[u8] = b"Store";
+const PEER_SEED: &[u8] = b"Peer";
+const LZ_RECEIVE_TYPES_SEED: &[u8] = b"LzReceiveTypes";
 
 #[program]
 pub mod my_oapp {
@@ -65,4 +69,11 @@ pub mod my_oapp {
         LzReceiveTypes::apply(&ctx, &params)
     }
 
+    // handler that returns metadata about which accounts are needed to call lz_receive_types
+    // Remove v2 info endpoint per user's request; discovery handled by V1 PDA
+
+    // Admin method to set Jupiter Lend configuration and SPL programs
+    pub fn set_jl_config(mut ctx: Context<SetJlConfig>, params: SetJlConfigParams) -> Result<()> {
+        SetJlConfig::apply(&mut ctx, params)
+    }
 }

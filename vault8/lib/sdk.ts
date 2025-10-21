@@ -390,6 +390,13 @@ export class CustomOAppSDK extends OmniSDK implements IOApp {
         return accountInfo != null
     }
 
+    public async receiveConfigIsInitialized(_eid: EndpointId): Promise<boolean> {
+        const deriver = new MessageLibPDADeriver(UlnProgram.PROGRAM_ID)
+        const [receiveConfig] = deriver.receiveConfig(_eid, new PublicKey(this.point.address))
+        const accountInfo = await this.connection.getAccountInfo(receiveConfig)
+        return accountInfo != null
+    }
+
     public async initConfig(eid: EndpointId): Promise<OmniTransaction | undefined> {
         const delegateAddress = await this.getDelegate()
         // delegate may be undefined if it has not yet been set.  In this case, use admin, which must exist.

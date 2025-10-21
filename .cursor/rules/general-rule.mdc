@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+Never assume what a function does. Always inspect the whole source.
+No work arounds or no shortcuts. No duplicate work. Always understand the code first then apply best practices.
+If you're not sure about how to accomplish a thing, ask about it.
+Attached documentations are your friend to finish the task, they will behave as the primary source of information.

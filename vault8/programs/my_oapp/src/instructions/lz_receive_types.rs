@@ -1,5 +1,5 @@
 use crate::*;
-use oapp::endpoint_cpi::{get_accounts_for_clear, get_accounts_for_send_compose, LzAccount};
+use oapp::endpoint_cpi::{get_accounts_for_clear, LzAccount};
 use oapp::{endpoint::ID as ENDPOINT_ID, LzReceiveParams};
 
 /// `lz_receive_types` is queried off-chain by the Executor before calling
@@ -47,16 +47,40 @@ impl LzReceiveTypes<'_> {
         );
         accounts.extend(accounts_for_clear);
 
-        // Provide accounts required by Endpoint::send_compose (index 0, self-compose) so lz_receive can compose back
-        let accounts_for_compose = get_accounts_for_send_compose(
-            ENDPOINT_ID,
-            &store,              // from (payer)
-            &store,              // to (self in this demo) — the executor routes by GUID back to EVM
-            &params.guid,
-            0,                   // index must match the compose option index used on EVM
-            &params.message,
-        );
-        accounts.extend(accounts_for_compose);
+        // Append Jupiter Lend CPI accounts in the exact order expected by lz_receive.
+    let s = &ctx.accounts.store;
+    // signer (store PDA) again as CPI account 0 in our JL slice.
+    accounts.push(LzAccount { pubkey: s.key(), is_signer: false, is_writable: true });
+    // Derive ATAs for the store PDA owner
+    // Official ATA seeds: [owner, token_program, mint]
+    let depositor_ata_seeds: &[&[u8]] = &[&s.key().to_bytes(), &s.token_program.to_bytes(), &s.usdc_mint.to_bytes()];
+    let (depositor_ata, _) = Pubkey::find_program_address(depositor_ata_seeds, &s.associated_token_program);
+    let recipient_ata_seeds: &[&[u8]] = &[&s.key().to_bytes(), &s.token_program.to_bytes(), &s.jl_f_token_mint.to_bytes()];
+    let (recipient_ata, _) = Pubkey::find_program_address(recipient_ata_seeds, &s.associated_token_program);
+    accounts.push(LzAccount { pubkey: depositor_ata, is_signer: false, is_writable: true });
+    accounts.push(LzAccount { pubkey: recipient_ata, is_signer: false, is_writable: true });
+        // Fixed accounts from Store config
+        accounts.push(LzAccount { pubkey: s.usdc_mint, is_signer: false, is_writable: false });
+        accounts.push(LzAccount { pubkey: s.jl_lending_admin, is_signer: false, is_writable: false });
+        accounts.push(LzAccount { pubkey: s.jl_lending, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_f_token_mint, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_supply_token_reserves_liquidity, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_lending_supply_position_on_liquidity, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_rate_model, is_signer: false, is_writable: false });
+        accounts.push(LzAccount { pubkey: s.jl_vault, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_liquidity, is_signer: false, is_writable: true });
+        // Jupiter docs specify liquidity_program as mutable
+        accounts.push(LzAccount { pubkey: s.jl_liquidity_program, is_signer: false, is_writable: true });
+        accounts.push(LzAccount { pubkey: s.jl_rewards_rate_model, is_signer: false, is_writable: false });
+        
+        // Well-known programs MUST be included so Solana runtime can find them during CPI
+        accounts.push(LzAccount { pubkey: s.token_program, is_signer: false, is_writable: false });
+        accounts.push(LzAccount { pubkey: s.associated_token_program, is_signer: false, is_writable: false });
+        use anchor_lang::solana_program::system_program;
+        accounts.push(LzAccount { pubkey: system_program::ID, is_signer: false, is_writable: false });
+        
+        // Jupiter Lend program MUST be included for invoke_signed to work
+        accounts.push(LzAccount { pubkey: s.jl_lending_program, is_signer: false, is_writable: false });
 
         Ok(accounts)
     }

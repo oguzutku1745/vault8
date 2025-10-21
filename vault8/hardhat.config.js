@@ -14,6 +14,13 @@ require("hardhat-deploy-ethers");
 require("@layerzerolabs/toolbox-hardhat");
 const lz_definitions_1 = require("@layerzerolabs/lz-definitions");
 require("./tasks/index");
+// Ensure custom tasks are registered even if index aggregation is bypassed by tooling/caching
+require("./tasks/common/sendAmount");
+require("./tasks/solana/setJlConfig");
+require("./tasks/solana/simulateReceive");
+require("./tasks/solana/forceInitConfig");
+require("./tasks/solana/forceSetPeer");
+require("./tasks/solana/forceInitLibraries");
 // Set your preferred authentication method
 //
 // If you prefer using a mnemonic, set a MNEMONIC environment variable
@@ -50,6 +57,11 @@ const config = {
         'arbitrum-sepolia': {
             eid: lz_definitions_1.EndpointId.ARBSEP_V2_TESTNET,
             url: process.env.RPC_URL_ARB_SEPOLIA || 'https://arbitrum-sepolia.gateway.tenderly.co',
+            accounts,
+        },
+        'BASE-sepolia': {
+            eid: lz_definitions_1.EndpointId.BASESEP_V2_TESTNET,
+            url: 'https://base-sepolia.gateway.tenderly.co',
             accounts,
         },
         hardhat: {
