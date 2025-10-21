@@ -50,7 +50,7 @@ impl InitStore<'_> {
             register_params,
         )?;
 
-        // Initialize LzReceiveTypesAccounts PDA for V2 with ALT support
+        // Initialize LzReceiveTypesAccounts PDA for V2
         ctx.accounts.lz_receive_types_accounts.store = ctx.accounts.store.key();
         // Set ALT if provided, otherwise default to Pubkey::default()
         ctx.accounts.lz_receive_types_accounts.alt = ctx.accounts.alt.as_ref().map(|a| a.key()).unwrap_or_default();

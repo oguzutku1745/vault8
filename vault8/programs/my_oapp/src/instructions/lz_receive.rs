@@ -25,7 +25,29 @@ pub struct LzReceive<'info> {
         bump = peer.bump,
         constraint = params.sender == peer.peer_address
     )]
-    pub peer: Account<'info, PeerConfig>
+    pub peer: Account<'info, PeerConfig>,
+    /// UserBalance PDA tracking this EVM user's deposits
+    /// Seeds derived from EVM address parsed from message
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = UserBalance::SIZE,
+        seeds = [USER_BALANCE_SEED, &parse_evm_address(&params.message)?],
+        bump
+    )]
+    pub user_balance: Account<'info, UserBalance>,
+    /// Payer for UserBalance PDA creation (Executor)
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Helper to parse EVM address from message for seeds derivation
+fn parse_evm_address(message: &[u8]) -> Result<[u8; 20]> {
+    require!(message.len() >= 28, MyOAppError::InvalidMessageType);
+    let mut evm_address = [0u8; 20];
+    evm_address.copy_from_slice(&message[8..28]);
+    Ok(evm_address)
 }
 
 impl LzReceive<'_> {
@@ -63,23 +85,44 @@ impl LzReceive<'_> {
             },
         )?;
 
-        // From here on: interpret message as a deposit instruction with amount in USDC (u64 little-endian),
-        // and optionally [correlationId:32][user:20] appended.
-        // Minimal schema: [amount_le_u64]
-        require!(params.message.len() >= 8, MyOAppError::InvalidMessageType);
-        let mut amt_bytes = [0u8;8];
+        // Parse 28-byte payload: [amount:8][evm_address:20]
+        require!(params.message.len() >= 28, MyOAppError::InvalidMessageType);
+        
+        // Parse amount (8 bytes, little-endian)
+        let mut amt_bytes = [0u8; 8];
         amt_bytes.copy_from_slice(&params.message[0..8]);
         let amount: u64 = u64::from_le_bytes(amt_bytes);
-
-        // Optional fields
-        let mut correlation_id: [u8; 32] = [0u8; 32];
-        let mut user20: [u8; 20] = [0u8; 20];
-        if params.message.len() >= 8 + 32 {
-            correlation_id.copy_from_slice(&params.message[8..8+32]);
+        
+        // Parse EVM address (20 bytes)
+        let mut evm_address = [0u8; 20];
+        evm_address.copy_from_slice(&params.message[8..28]);
+        
+        // Update UserBalance PDA
+        let user_balance = &mut ctx.accounts.user_balance;
+        let clock = Clock::get()?;
+        
+        // Initialize on first deposit
+        if user_balance.deposit_count == 0 {
+            user_balance.evm_address = evm_address;
+            user_balance.bump = ctx.bumps.user_balance;
         }
-        if params.message.len() >= 8 + 32 + 20 {
-            user20.copy_from_slice(&params.message[8+32..8+32+20]);
-        }
+        
+        // Update cumulative stats
+        user_balance.total_deposited = user_balance.total_deposited.checked_add(amount)
+            .ok_or(MyOAppError::Overflow)?;
+        user_balance.last_updated = clock.unix_timestamp;
+        user_balance.deposit_count = user_balance.deposit_count.checked_add(1)
+            .ok_or(MyOAppError::Overflow)?;
+        
+        // Emit event for bot indexing with GUID
+        emit!(DepositEvent {
+            guid: params.guid,
+            evm_address,
+            amount,
+            new_total: user_balance.total_deposited,
+            deposit_index: user_balance.deposit_count,
+            timestamp: clock.unix_timestamp,
+        });
 
         // Now perform a CPI deposit into Jupiter Lend using remaining accounts provided by lz_receive_types.
         // Account ordering after Clear accounts should match the JL deposit accounts we expect.

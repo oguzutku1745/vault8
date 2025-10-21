@@ -195,6 +195,10 @@ sh -c "$(curl -sSfL https://release.anza.xyz/v1.18.26/install)"
 solana program deploy --program-id target/deploy/my_oapp-keypair.json target/verifiable/my_oapp.so -u devnet --with-compute-unit-price <COMPUTE_UNIT_PRICE_IN_MICRO_LAMPORTS>
 ```
 
+```bash
+solana program deploy --program-id target/deploy/my_oapp-keypair.json target/deploy/my_oapp.so -u devnet
+``` 
+
 Set the storage accounts
 ```bash
 npx hardhat lz:oapp:solana:set-jl-config --eid 40168 --jl-config ../vault8-frontend/scripts/jl-context-devnet-usdc.json

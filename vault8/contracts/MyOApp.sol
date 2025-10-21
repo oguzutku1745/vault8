@@ -55,16 +55,20 @@ contract MyOApp is OApp, OAppOptionsType3 {
         }
     }
 
-    // Deposit: send 8-byte LE amount payload to Solana; msg.value must cover lzReceive + compose gas on dst
+    // Deposit: send 28-byte payload (amount + EVM address) to Solana for balance tracking
     function requestDeposit(
         uint32 _dstEid,
         uint64 _amountBaseUnits,
         bytes calldata _options
     ) external payable returns (MessagingReceipt memory receipt) {
-        bytes memory payload = _toLeBytes8(_amountBaseUnits);
+        // Build 28-byte payload: [amount:8][evm_address:20]
+        bytes memory payload = abi.encodePacked(
+            _toLeBytes8(_amountBaseUnits),  // 8 bytes: amount (little-endian)
+            msg.sender                       // 20 bytes: EVM address
+        );
         bytes memory options = combineOptions(_dstEid, /*msgType*/ 1, _options);
         receipt = _lzSend(_dstEid, payload, options, MessagingFee(msg.value, 0), payable(msg.sender));
-        // Track sender by GUID to credit on ACK
+        // Track sender by GUID for bot to correlate with Solana DepositEvent
         pendingSender[receipt.guid] = msg.sender;
     }
 
@@ -74,7 +78,11 @@ contract MyOApp is OApp, OAppOptionsType3 {
         bytes calldata _options,
         bool _payInLzToken
     ) external view returns (MessagingFee memory fee) {
-        bytes memory payload = _toLeBytes8(_amountBaseUnits);
+        // Build same 28-byte payload for accurate fee quote
+        bytes memory payload = abi.encodePacked(
+            _toLeBytes8(_amountBaseUnits),
+            msg.sender
+        );
         bytes memory options = combineOptions(_dstEid, /*msgType*/ 1, _options);
         return _quote(_dstEid, payload, options, _payInLzToken);
     }

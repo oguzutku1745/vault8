@@ -10,8 +10,9 @@ const action = async ({ dstEid, amountBaseUnits, contractName, lzReceiveGas, com
     if (amt > (1n << 64n) - 1n)
         throw new Error('amountBaseUnits does not fit into u64');
     // Build options: ensure both lzReceive and compose gas are covered on Solana and on the EVM ACK path
+    // _value parameter = lamports to fund rent + fees on Solana (0.003 SOL = 3M lamports)
     const options = lz_v2_utilities_1.Options.newOptions()
-        .addExecutorLzReceiveOption(lzReceiveGas, 0)
+        .addExecutorLzReceiveOption(lzReceiveGas, 3000000) // _value: 3M lamports for UserBalance PDA rent + fees
         .addExecutorComposeOption(0, composeGas, 0) // index 0 compose
         .toHex()
         .toString();
@@ -27,6 +28,6 @@ const action = async ({ dstEid, amountBaseUnits, contractName, lzReceiveGas, com
     .addParam('dstEid', 'Destination endpoint ID', undefined, config_1.types.int, false)
     .addParam('amountBaseUnits', 'Amount in base units (fits in u64)', undefined, config_1.types.string, false)
     .addOptionalParam('contractName', 'Deployed contract name', 'MyOApp', config_1.types.string)
-    .addOptionalParam('lzReceiveGas', 'lzReceive gas on Solana', 230000, config_1.types.int)
+    .addOptionalParam('lzReceiveGas', 'lzReceive gas on Solana (compute units)', 600000, config_1.types.int)
     .addOptionalParam('composeGas', 'compose gas for ACK', 60000, config_1.types.int)
     .setAction(action);
