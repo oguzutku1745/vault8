@@ -1,5 +1,6 @@
 pub mod send;
 pub mod init_store;
+pub mod init_store_atas;
 pub mod lz_receive;
 pub mod lz_receive_types;
 pub mod lz_receive_types_info;
@@ -11,6 +12,7 @@ pub mod set_alt;
 
 pub use send::*;
 pub use init_store::*;
+pub use init_store_atas::*;
 pub use lz_receive::*;
 pub use lz_receive_types::*;
 pub use lz_receive_types_info::*;

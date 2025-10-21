@@ -95,4 +95,9 @@ pub mod my_oapp {
     pub fn set_alt(mut ctx: Context<SetAlt>) -> Result<()> {
         SetAlt::apply(&mut ctx)
     }
+
+    // One-time setup: Initialize Store's USDC and fToken ATAs
+    pub fn init_store_atas(ctx: Context<InitStoreAtas>) -> Result<()> {
+        InitStoreAtas::apply(&ctx)
+    }
 }
