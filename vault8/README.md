@@ -317,7 +317,7 @@ Proof of succesfull message + jup deposit:
 https://testnet.layerzeroscan.com/tx/0xe7485eecbd75c22fa051a9d98a966aa542d9942f0c0ba2ac22847c44fa8f92aa
 
 
-End-to-end:
+End-to-end tests:
 CCTP:
 Transaction Hash (Base): 0xb74606670b0a2a3f6383fe38c5031bef7d6e5e03c7acbd64cb9844331a5d6dd4
 
@@ -325,7 +325,7 @@ Check Solana Explorer: https://explorer.solana.com/address/MHso38U1uo8br3gSU6bXK
 
 LZ Messages:
 LayerZero Scan:
-https://testnet.layerzeroscan.com/tx/0x15fb6e304c5452115b84bc12cf335546005f1e820ffa4ac704dcb6f5bdfcf265
+https://testnet.layerzeroscan.com/tx/0xfb222c1c48e23071692fb24fc70dd611bde6686158999b3eb28ea6077b1eb0d3
 
 Base Sepolia Transaction:
 https://sepolia.basescan.org/tx/0xfb222c1c48e23071692fb24fc70dd611bde6686158999b3eb28ea6077b1eb0d3
