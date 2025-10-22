@@ -28,3 +28,8 @@ pnpm-error.log
 # Editor and OS files
 .DS_Store
 .idea
+
+# Bot sensitive files
+bot/bot-keypair.json
+bot/processed-nonces.json
+cctp-attestation.json
