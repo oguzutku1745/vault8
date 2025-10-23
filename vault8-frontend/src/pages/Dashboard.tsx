@@ -8,17 +8,60 @@ import { MetricCard } from "@/components/metric-card"
 import { AllocationChart } from "@/components/allocation-chart"
 import { ChainBadge } from "@/components/chain-badge"
 import { VaultCreationWizard } from "@/components/vault-wizard/vault-creation-wizard"
+import { SyncModal } from "@/components/vault-operations/sync-modal"
+import { RebalanceModal } from "@/components/vault-operations/rebalance-modal"
+import { AdjustBufferModal } from "@/components/vault-operations/adjust-buffer-modal"
+import { AllocateFundsModal } from "@/components/vault-wizard/allocate-funds-modal"
 import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity } from "lucide-react"
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("overview")
+  const [showSyncModal, setShowSyncModal] = useState(false)
+  const [showRebalanceModal, setShowRebalanceModal] = useState(false)
+  const [showAdjustBufferModal, setShowAdjustBufferModal] = useState(false)
+  const [showAllocateModal, setShowAllocateModal] = useState(false)
+  const [liquidityBuffer, setLiquidityBuffer] = useState(25)
 
   // Mock data
   const allocationData = [
     { name: "Compound V3", value: 40, color: "#0052FF" },
     { name: "Jupiter", value: 35, color: "#9945FF" },
-    { name: "Liquidity Buffer", value: 25, color: "#14F195" },
+    { name: "Liquidity Buffer", value: liquidityBuffer, color: "#14F195" },
   ]
+
+  const strategies = [
+    { id: "compound-v3", name: "Compound V3", currentPercentage: 40 },
+    { id: "jupiter", name: "Jupiter", currentPercentage: 35 },
+    { id: "liquidity-buffer", name: "Liquidity Buffer", currentPercentage: liquidityBuffer },
+  ]
+
+  // Operation handlers
+  const handleSync = async () => {
+    // Simulate sync operation
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    console.log("Vault synced")
+    // In real app: refetch data here
+  }
+
+  const handleRebalance = async (allocations: Record<string, number>) => {
+    // Simulate rebalance operation
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    console.log("Rebalanced:", allocations)
+    // In real app: execute rebalance transaction
+  }
+
+  const handleAdjustBuffer = async (newBuffer: number) => {
+    // Simulate buffer adjustment
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setLiquidityBuffer(newBuffer)
+    console.log("Buffer adjusted to:", newBuffer)
+    // In real app: update contract state
+  }
+
+  const handleAllocate = (baseAmount: number, solanaAmount: number) => {
+    console.log("Allocating:", { baseAmount, solanaAmount })
+    // In real app: execute deposit transactions
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -71,10 +114,10 @@ export default function DashboardPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Liquidity Buffer</span>
-                        <span className="font-medium text-foreground">25%</span>
+                        <span className="font-medium text-foreground">{liquidityBuffer}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full bg-accent rounded-full" style={{ width: "25%" }} />
+                        <div className="h-full bg-accent rounded-full" style={{ width: `${liquidityBuffer}%` }} />
                       </div>
                     </div>
 
@@ -109,7 +152,11 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto flex-col gap-2 py-4 bg-transparent"
+                      onClick={() => setShowSyncModal(true)}
+                    >
                       <RefreshCw className="h-5 w-5 text-primary" />
                       <div className="text-center">
                         <p className="font-semibold">Sync</p>
@@ -117,7 +164,11 @@ export default function DashboardPage() {
                       </div>
                     </Button>
 
-                    <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto flex-col gap-2 py-4 bg-transparent"
+                      onClick={() => setShowRebalanceModal(true)}
+                    >
                       <Layers className="h-5 w-5 text-secondary" />
                       <div className="text-center">
                         <p className="font-semibold">Rebalance</p>
@@ -125,7 +176,11 @@ export default function DashboardPage() {
                       </div>
                     </Button>
 
-                    <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto flex-col gap-2 py-4 bg-transparent"
+                      onClick={() => setShowAdjustBufferModal(true)}
+                    >
                       <Settings className="h-5 w-5 text-accent" />
                       <div className="text-center">
                         <p className="font-semibold">Adjust Buffer</p>
@@ -133,7 +188,11 @@ export default function DashboardPage() {
                       </div>
                     </Button>
 
-                    <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto flex-col gap-2 py-4 bg-transparent"
+                      onClick={() => setShowAllocateModal(true)}
+                    >
                       <DollarSign className="h-5 w-5 text-warning" />
                       <div className="text-center">
                         <p className="font-semibold">Allocate</p>
@@ -195,6 +254,30 @@ export default function DashboardPage() {
       </main>
 
       <Footer />
+
+      {/* Operation Modals */}
+      <SyncModal 
+        open={showSyncModal} 
+        onOpenChange={setShowSyncModal} 
+        onSync={handleSync}
+      />
+      <RebalanceModal 
+        open={showRebalanceModal} 
+        onOpenChange={setShowRebalanceModal}
+        strategies={strategies}
+        onRebalance={handleRebalance}
+      />
+      <AdjustBufferModal 
+        open={showAdjustBufferModal} 
+        onOpenChange={setShowAdjustBufferModal}
+        currentBuffer={liquidityBuffer}
+        onAdjustBuffer={handleAdjustBuffer}
+      />
+      <AllocateFundsModal 
+        open={showAllocateModal} 
+        onOpenChange={setShowAllocateModal}
+        onAllocate={handleAllocate}
+      />
     </div>
   )
 }

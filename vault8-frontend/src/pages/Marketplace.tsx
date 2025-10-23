@@ -163,10 +163,8 @@ export default function MarketplacePage() {
                   <SelectValue placeholder="Filter by chain" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Chains</SelectItem>
-                  <SelectItem value="base">Base Only</SelectItem>
-                  <SelectItem value="solana">Solana Only</SelectItem>
                   <SelectItem value="cross-chain">Cross-Chain</SelectItem>
+                  <SelectItem value="base">Base Only</SelectItem>
                 </SelectContent>
               </Select>
 

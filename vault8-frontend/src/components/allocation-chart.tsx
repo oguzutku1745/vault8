@@ -45,6 +45,12 @@ export function AllocationChart({ data, title = "Strategy Allocation" }: Allocat
                   borderRadius: "0.5rem",
                   color: "#ffffff",
                 }}
+                itemStyle={{
+                  color: "#ffffff",
+                }}
+                labelStyle={{
+                  color: "#ffffff",
+                }}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -68,7 +68,11 @@ export function VaultCreationWizard() {
               <ChainSelectionStep selectedChains={selectedChains} onChainToggle={handleChainToggle} />
             )}
             {currentStep === 2 && (
-              <StrategySelectionStep selectedStrategies={selectedStrategies} onStrategyToggle={handleStrategyToggle} />
+              <StrategySelectionStep 
+                selectedStrategies={selectedStrategies} 
+                selectedChains={selectedChains}
+                onStrategyToggle={handleStrategyToggle} 
+              />
             )}
             {currentStep === 3 && (
               <LiquidityBufferStep liquidityBuffer={liquidityBuffer} onBufferChange={setLiquidityBuffer} />
