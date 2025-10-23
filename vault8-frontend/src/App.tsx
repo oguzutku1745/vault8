@@ -1,17 +1,17 @@
+/// <reference path="./react-shims.d.ts" />
 import { createAppKit } from '@reown/appkit/react'
-
 import { WagmiProvider } from 'wagmi'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ActionButtonList } from './components/ActionButtonList'
-import { InfoList } from './components/InfoList'
-import CrossChainMessaging from './components/cross-chain-messaging'
-import BaseReceiverViewer from './components/BaseReceiverViewer'
-import BaseToSolanaSender from './components/BaseToSolanaSender'
-import SolanaReceiverViewer from './components/SolanaReceiverViewer'
 import { projectId, metadata, networks, wagmiAdapter , solanaWeb3JsAdapter} from './config'
+import { ThemeProvider } from '@/components/theme-provider'
 
-import "./App.css"
+// Import pages
+import HomePage from './pages/Home'
+import DashboardPage from './pages/Dashboard'
+import MarketplacePage from './pages/Marketplace'
+import VaultDetailPage from './pages/VaultDetail'
 
 const queryClient = new QueryClient()
 
@@ -36,29 +36,21 @@ createAppKit({
 })
 
 export function App() {
-
   return (
-    <div className={"pages"}>
-      <img src="/reown.svg" alt="Reown" style={{ width: '150px', height: '150px' }} />
-      <h1>AppKit Wagmi+solana React dApp Example</h1>
+    <ThemeProvider defaultTheme="dark" storageKey="vault8-ui-theme">
       <WagmiProvider config={wagmiAdapter.wagmiConfig}>
         <QueryClientProvider client={queryClient}>
-            <appkit-button />
-            <ActionButtonList />
-            <div className="advice">
-              <p>
-                This projectId only works on localhost. <br/>
-                Go to <a href="https://dashboard.reown.com" target="_blank" className="link-button" rel="Reown Dashboard">Reown Dashboard</a> to get your own.
-              </p>
-            </div>
-            <CrossChainMessaging />
-            <BaseReceiverViewer />
-            <BaseToSolanaSender />
-            <SolanaReceiverViewer />
-            <InfoList />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/vault/:id" element={<VaultDetailPage />} />
+            </Routes>
+          </BrowserRouter>
         </QueryClientProvider>
       </WagmiProvider>
-    </div>
+    </ThemeProvider>
   )
 }
 

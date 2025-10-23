@@ -1,3 +1,6 @@
+// Import Tailwind CSS and animations
+import './index.css'
+
 // Guarded dynamic boot: attempt to import React and App, display any errors on-page
 async function boot() {
   // Provide a few small runtime polyfills for libs that expect Node builtins.

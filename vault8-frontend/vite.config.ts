@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -9,6 +10,11 @@ export default defineConfig({
     // Prefer .ts over .js when both are present to favor ESM TS sources in generated folders
     extensions: ['.mjs', '.ts', '.js', '.jsx', '.tsx', '.json'],
     alias: [
+      // ====== Path Aliases for shadcn/ui components ======
+      {
+        find: '@',
+        replacement: path.resolve(__dirname, './src'),
+      },
       // Map phosphor icon subpath imports to the actual dist icons directory
       {
         find: /^@phosphor-icons\/webcomponents\/(.*)$/,
