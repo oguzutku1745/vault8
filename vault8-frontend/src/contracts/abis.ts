@@ -195,6 +195,23 @@ export const ManagedVaultABI = [
     ],
     outputs: [],
     stateMutability: 'payable'
+  },
+  {
+    type: 'function',
+    name: 'ownerVaults',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'index', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'vaultOwners',
+    inputs: [{ name: 'vault', type: 'address' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view'
   }
 ] as const;
 

@@ -10,9 +10,11 @@ export const NETWORK_CONFIG = {
 } as const;
 
 export const CONTRACT_ADDRESSES = {
-  VAULT_FACTORY: "0x773aEEd3963bb38bf2a432463c056E4CEFfA00ff",
+  VAULT_FACTORY: "0x8098cCf1b085ae56419682c2219760B13C8beFfC",
   USDC: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia USDC
-} as const;
+} as const
+
+export const ADMIN_ADDRESS = "0x79B7931d9bb01e58beAE970e1dd74146317aa667" as const;
 
 /**
  * Target protocol addresses (NOT the adapters - these are the protocols we interact with)

@@ -13,10 +13,19 @@ import { SyncModal } from "@/components/vault-operations/sync-modal"
 import { RebalanceModal } from "@/components/vault-operations/rebalance-modal"
 import { AdjustBufferModal } from "@/components/vault-operations/adjust-buffer-modal"
 import { AllocateFundsModal } from "@/components/vault-wizard/allocate-funds-modal"
+import { AddressDisplay } from "@/components/address-display"
 import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity, Wallet } from "lucide-react"
+import { useOwnerVault } from "@/contracts/hooks/useFactoryRead"
+import { ADMIN_ADDRESS } from "@/contracts/config"
 
 export default function DashboardPage() {
   const { address, isConnected } = useAppKitAccount()
+  
+  // Get the user's vault (first vault at index 0)
+  const { vaultAddress: userVaultAddress, isLoading: isLoadingVault } = useOwnerVault(address as `0x${string}` | undefined, 0)
+  
+  // Check if user is admin
+  const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()
   const [activeTab, setActiveTab] = useState("overview")
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [showRebalanceModal, setShowRebalanceModal] = useState(false)
@@ -74,6 +83,12 @@ export default function DashboardPage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Vault Dashboard</h1>
             <p className="text-muted-foreground">Manage your cross-chain yield optimization vault</p>
+            {isConnected && userVaultAddress && userVaultAddress !== "0x0000000000000000000000000000000000000000" && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Your Vault:</span>
+                <AddressDisplay address={userVaultAddress} showCopy showExplorer chainId={84532} />
+              </div>
+            )}
           </div>
 
           {!isConnected && (
@@ -94,9 +109,11 @@ export default function DashboardPage() {
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className={`grid w-full max-w-md ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <TabsTrigger value="overview" disabled={!isConnected}>Overview</TabsTrigger>
-              <TabsTrigger value="create" disabled={!isConnected}>Create Vault</TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="create" disabled={!isConnected}>Create Vault</TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -265,9 +282,11 @@ export default function DashboardPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="create">
-              <VaultCreationWizard />
-            </TabsContent>
+            {isAdmin && (
+              <TabsContent value="create">
+                <VaultCreationWizard />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>
