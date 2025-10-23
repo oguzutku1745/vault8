@@ -18,7 +18,7 @@ export const CONTRACT_ADDRESSES = {
  * Target protocol addresses (NOT the adapters - these are the protocols we interact with)
  */
 export const TARGET_PROTOCOLS = {
-  COMPOUND_V3_COMET: "0x05f26c54f38EFC305438AEfc4Aeec903Ad4bb6ce", // Compound V3 Comet on Base Sepolia
+  COMPOUND_V3_COMET: "0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017", // Compound V3 Comet on Base Sepolia
   MYOAPP_BRIDGE: "0x0D7FBc907154De84897d9E0Db4B99C391A529488", // MyOApp (Solana bridge)
   SOLANA_DST_EID: 40168, // LayerZero Solana endpoint ID
   DEFAULT_LZ_OPTIONS: "0x000301002101000000000000000000000000000927c0000000000000000000000000002dc6c0", // Default LayerZero execution options

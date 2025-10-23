@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useAppKitAccount } from "@reown/appkit/react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -12,9 +13,10 @@ import { SyncModal } from "@/components/vault-operations/sync-modal"
 import { RebalanceModal } from "@/components/vault-operations/rebalance-modal"
 import { AdjustBufferModal } from "@/components/vault-operations/adjust-buffer-modal"
 import { AllocateFundsModal } from "@/components/vault-wizard/allocate-funds-modal"
-import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity } from "lucide-react"
+import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity, Wallet } from "lucide-react"
 
 export default function DashboardPage() {
+  const { address, isConnected } = useAppKitAccount()
   const [activeTab, setActiveTab] = useState("overview")
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [showRebalanceModal, setShowRebalanceModal] = useState(false)
@@ -74,10 +76,27 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">Manage your cross-chain yield optimization vault</p>
           </div>
 
+          {!isConnected && (
+            <Card className="border-warning bg-warning/5 mb-8">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <Wallet className="h-6 w-6 text-warning shrink-0 mt-1" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">Connect Your Wallet</h3>
+                    <p className="text-muted-foreground">
+                      Please connect your wallet to access the dashboard and manage your vaults.
+                    </p>
+                    <appkit-button />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="create">Create Vault</TabsTrigger>
+              <TabsTrigger value="overview" disabled={!isConnected}>Overview</TabsTrigger>
+              <TabsTrigger value="create" disabled={!isConnected}>Create Vault</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">

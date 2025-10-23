@@ -2,9 +2,11 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, Circle, Loader2, AlertCircle, ExternalLink, Copy } from "lucide-react"
-import { useDeployContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { useSendTransaction, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { useAppKitAccount } from "@reown/appkit/react"
+import { encodeFunctionData, encodeDeployData } from "viem"
 import { CONTRACT_ADDRESSES, TARGET_PROTOCOLS, STRATEGY_METADATA_BY_ID } from "@/contracts/config"
-import { VaultFactoryABI } from "@/contracts/abis"
+import { VaultFactoryABI, ManagedVaultABI } from "@/contracts/abis"
 import { StrategyAdapterCompoundIIIABI, StrategyAdapterSolanaABI, STRATEGY_ADAPTER_COMPOUND_BYTECODE, STRATEGY_ADAPTER_SOLANA_BYTECODE } from "@/contracts/abis-strategies"
 import type { Address } from "viem"
 
@@ -32,6 +34,8 @@ interface DeploymentFlowModalProps {
 }
 
 export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplete }: DeploymentFlowModalProps) {
+  const { address, isConnected } = useAppKitAccount()
+  
   const [steps, setSteps] = useState<DeploymentStep[]>([
     { id: 1, title: "Deploy Strategy Adapters", description: "Creating new strategy adapter contracts...", status: "pending" },
     { id: 2, title: "Approve Strategies", description: "Registering adapters with VaultFactory...", status: "pending" },
@@ -42,6 +46,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
   const [currentStepId, setCurrentStepId] = useState(0) // 0 = not started
   const [deployedAdapterAddresses, setDeployedAdapterAddresses] = useState<Address[]>([])
   const [deployedVaultAddress, setDeployedVaultAddress] = useState<Address | null>(null)
+  const [deployingAdapter, setDeployingAdapter] = useState<"compound" | "solana" | null>(null)
 
   // Check if bytecode is available
   const hasBytecode = STRATEGY_ADAPTER_COMPOUND_BYTECODE && STRATEGY_ADAPTER_SOLANA_BYTECODE
@@ -56,6 +61,14 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
     setCurrentStepId(0)
     setDeployedAdapterAddresses([])
     setDeployedVaultAddress(null)
+    setDeployingAdapter(null)
+    setHasStartedApproval(false)
+    setApprovalIndex(0)
+    setHasStartedVaultDeploy(false)
+    setHasStartedConfig(false)
+    setConfigIndex(0)
+    setIsConfiguringBuffer(false)
+    setLastProcessedConfigTx(null)
     setSteps(prev => prev.map(step => ({ ...step, status: "pending", txHash: undefined, deployedAddresses: undefined, error: undefined })))
   }
 
@@ -72,89 +85,205 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
   }
 
   // --- Step 1: Deploy Strategy Adapters ---
-  const { deployContract: deployCompoundAdapter, data: compoundDeployHash, isPending: isDeployingCompound, isSuccess: compoundDeploySuccess } = useDeployContract()
-  const { deployContract: deploySolanaAdapter, data: solanaDeployHash, isPending: isDeployingSolana, isSuccess: solanaDeploySuccess } = useDeployContract()
+  const { sendTransaction: deployAdapter, data: deployHash, isPending: isDeploying, error: deployError } = useSendTransaction()
+  const { data: deployReceipt, isSuccess: deployReceiptSuccess, isError: deployReceiptError, error: deployReceiptErrorDetails } = useWaitForTransactionReceipt({ hash: deployHash })
 
-  const { data: compoundReceipt, isSuccess: compoundReceiptSuccess } = useWaitForTransactionReceipt({ hash: compoundDeployHash })
-  const { data: solanaReceipt, isSuccess: solanaReceiptSuccess } = useWaitForTransactionReceipt({ hash: solanaDeployHash })
+  const handleDeployAdapters = async () => {
+    if (!isConnected || !address) {
+      updateStep(1, { status: "error", error: "Please connect your wallet first" })
+      return
+    }
 
-  const handleDeployAdapters = () => {
-    updateStep(1, { status: "in_progress" })
+    // Reset error state if retrying
+    updateStep(1, { status: "in_progress", error: undefined })
+    setDeployedAdapterAddresses([]) // Reset on retry
 
     const needsCompound = vaultConfig.selectedStrategies.includes("compound-v3")
     const needsSolana = vaultConfig.selectedStrategies.includes("jupiter")
 
-    // Deploy Compound adapter if needed
-    if (needsCompound) {
-      deployCompoundAdapter({
-        abi: StrategyAdapterCompoundIIIABI,
-        bytecode: STRATEGY_ADAPTER_COMPOUND_BYTECODE as `0x${string}`,
-        args: [TARGET_PROTOCOLS.COMPOUND_V3_COMET, CONTRACT_ADDRESSES.USDC],
-      })
+    // Deploy Compound adapter first if needed
+    if (needsCompound && !deployingAdapter) {
+      try {
+        setDeployingAdapter("compound")
+        updateStep(1, { description: "Deploying Compound V3 adapter..." })
+        const deployData = encodeDeployData({
+          abi: StrategyAdapterCompoundIIIABI,
+          bytecode: STRATEGY_ADAPTER_COMPOUND_BYTECODE as `0x${string}`,
+          args: [TARGET_PROTOCOLS.COMPOUND_V3_COMET, CONTRACT_ADDRESSES.USDC],
+        })
+        
+        deployAdapter({
+          to: null,
+          data: deployData,
+        })
+      } catch (error: any) {
+        updateStep(1, { status: "error", error: `Failed to prepare deployment: ${error.message}` })
+        setDeployingAdapter(null)
+      }
     }
-
-    // Deploy Solana adapter if needed
-    if (needsSolana) {
-      deploySolanaAdapter({
-        abi: StrategyAdapterSolanaABI,
-        bytecode: STRATEGY_ADAPTER_SOLANA_BYTECODE as `0x${string}`,
-        args: [CONTRACT_ADDRESSES.USDC, TARGET_PROTOCOLS.MYOAPP_BRIDGE, TARGET_PROTOCOLS.SOLANA_DST_EID, TARGET_PROTOCOLS.DEFAULT_LZ_OPTIONS],
-      })
+    // Deploy Solana adapter first if Compound not needed
+    else if (needsSolana && !needsCompound && !deployingAdapter) {
+      try {
+        setDeployingAdapter("solana")
+        updateStep(1, { description: "Deploying Solana adapter..." })
+        const deployData = encodeDeployData({
+          abi: StrategyAdapterSolanaABI,
+          bytecode: STRATEGY_ADAPTER_SOLANA_BYTECODE as `0x${string}`,
+          args: [CONTRACT_ADDRESSES.USDC, TARGET_PROTOCOLS.MYOAPP_BRIDGE, TARGET_PROTOCOLS.SOLANA_DST_EID, TARGET_PROTOCOLS.DEFAULT_LZ_OPTIONS],
+        })
+        
+        deployAdapter({
+          to: null,
+          data: deployData,
+        })
+      } catch (error: any) {
+        updateStep(1, { status: "error", error: `Failed to prepare deployment: ${error.message}` })
+        setDeployingAdapter(null)
+      }
     }
   }
 
-  // Monitor adapter deployments
+  // Monitor adapter deployment errors
   useEffect(() => {
     if (currentStepId !== 1) return
+    
+    if (deployError) {
+      updateStep(1, { 
+        status: "error", 
+        error: `Transaction failed: ${deployError.message || 'Unknown error'}`,
+      })
+      setDeployingAdapter(null)
+    }
+    
+    if (deployReceiptError && deployReceiptErrorDetails) {
+      const errorMessage = deployReceiptErrorDetails.message || 'Transaction reverted'
+      updateStep(1, { 
+        status: "error", 
+        error: `Deployment failed: ${errorMessage}`,
+        txHash: deployHash,
+      })
+      setDeployingAdapter(null)
+    }
+  }, [deployError, deployReceiptError, deployReceiptErrorDetails, currentStepId, deployHash])
+
+  // Monitor adapter deployments
+  useEffect(() => {
+    if (currentStepId !== 1 || !deployReceiptSuccess || !deployReceipt) return
 
     const needsCompound = vaultConfig.selectedStrategies.includes("compound-v3")
     const needsSolana = vaultConfig.selectedStrategies.includes("jupiter")
 
-    const compoundDone = !needsCompound || (compoundReceiptSuccess && compoundReceipt?.contractAddress)
-    const solanaDone = !needsSolana || (solanaReceiptSuccess && solanaReceipt?.contractAddress)
-
-    if (compoundDone && solanaDone) {
-      const addresses: Address[] = []
-      if (needsCompound && compoundReceipt?.contractAddress) addresses.push(compoundReceipt.contractAddress)
-      if (needsSolana && solanaReceipt?.contractAddress) addresses.push(solanaReceipt.contractAddress)
-
-      setDeployedAdapterAddresses(addresses)
+    // Check if transaction was successful
+    if (deployReceipt.status === 'reverted') {
       updateStep(1, { 
-        status: "success", 
-        deployedAddresses: addresses,
-        description: `Deployed ${addresses.length} adapter(s)` 
+        status: "error", 
+        error: "Transaction reverted. The contract deployment failed.",
+        txHash: deployHash,
       })
-      setCurrentStepId(2)
+      setDeployingAdapter(null)
+      return
     }
-  }, [compoundReceiptSuccess, solanaReceiptSuccess, compoundReceipt, solanaReceipt, currentStepId, vaultConfig.selectedStrategies])
+
+    if (deployReceipt.contractAddress) {
+      const newAddresses = [...deployedAdapterAddresses, deployReceipt.contractAddress]
+      setDeployedAdapterAddresses(newAddresses)
+
+      // Check if we need to deploy another adapter
+      if (deployingAdapter === "compound" && needsSolana) {
+        // Compound done, now deploy Solana
+        setDeployingAdapter("solana")
+        const deployData = encodeDeployData({
+          abi: StrategyAdapterSolanaABI,
+          bytecode: STRATEGY_ADAPTER_SOLANA_BYTECODE as `0x${string}`,
+          args: [CONTRACT_ADDRESSES.USDC, TARGET_PROTOCOLS.MYOAPP_BRIDGE, TARGET_PROTOCOLS.SOLANA_DST_EID, TARGET_PROTOCOLS.DEFAULT_LZ_OPTIONS],
+        })
+        
+        deployAdapter({
+          to: null,
+          data: deployData,
+        })
+      } else {
+        // All adapters deployed
+        setDeployingAdapter(null)
+        updateStep(1, { 
+          status: "success", 
+          deployedAddresses: newAddresses,
+          description: `Deployed ${newAddresses.length} adapter(s)`,
+          txHash: deployHash,
+        })
+        setCurrentStepId(2)
+      }
+    }
+  }, [deployReceiptSuccess, deployReceipt, deployingAdapter, deployedAdapterAddresses, vaultConfig.selectedStrategies, currentStepId, deployHash])
 
   // --- Step 2: Approve Strategies ---
-  const { writeContract: approveStrategy, data: approveHash, isPending: isApproving, isSuccess: approveSuccess } = useWriteContract()
-  const { data: approveReceipt, isSuccess: approveReceiptSuccess } = useWaitForTransactionReceipt({ hash: approveHash })
+  const { writeContract: approveStrategy, data: approveHash, isPending: isApproving, error: approveError } = useWriteContract()
+  const { data: approveReceipt, isSuccess: approveReceiptSuccess, isError: approveReceiptError } = useWaitForTransactionReceipt({ hash: approveHash })
 
   const [approvalIndex, setApprovalIndex] = useState(0)
+  const [hasStartedApproval, setHasStartedApproval] = useState(false)
 
+  // Start approval process when entering step 2
   useEffect(() => {
-    if (currentStepId === 2 && deployedAdapterAddresses.length > 0 && approvalIndex === 0) {
-      // Start approving strategies
-      updateStep(2, { status: "in_progress" })
-      approveStrategy({
-        address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
-        abi: VaultFactoryABI,
-        functionName: "approveStrategy",
-        args: [deployedAdapterAddresses[approvalIndex]],
-      })
+    if (currentStepId === 2 && deployedAdapterAddresses.length > 0 && !hasStartedApproval) {
+      setHasStartedApproval(true)
+      setApprovalIndex(0) // Reset index
+      updateStep(2, { status: "in_progress", description: `Approving strategy 1 of ${deployedAdapterAddresses.length}...` })
+      
+      console.log("Step 2: Attempting to approve strategy:", deployedAdapterAddresses[0])
+      console.log("VaultFactory address:", CONTRACT_ADDRESSES.VAULT_FACTORY)
+      
+      try {
+        approveStrategy({
+          address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
+          abi: VaultFactoryABI,
+          functionName: "approveStrategy",
+          args: [deployedAdapterAddresses[0]],
+        })
+      } catch (error: any) {
+        console.error("Error calling approveStrategy:", error)
+        updateStep(2, { status: "error", error: `Failed to call approveStrategy: ${error.message}` })
+        setHasStartedApproval(false)
+      }
     }
-  }, [currentStepId, deployedAdapterAddresses, approvalIndex])
-
+  }, [currentStepId, deployedAdapterAddresses, hasStartedApproval])
+  
+  // Monitor approval errors from writeContract
   useEffect(() => {
     if (currentStepId !== 2) return
-    if (!approveReceiptSuccess) return
+    if (approveError) {
+      console.error("Approve transaction error:", approveError)
+      updateStep(2, { 
+        status: "error", 
+        error: `Transaction failed: ${approveError.message || 'Unknown error'}`,
+      })
+      setHasStartedApproval(false)
+    }
+  }, [approveError, currentStepId])
 
-    // Move to next approval or proceed to step 3
+  // Handle approval errors
+  useEffect(() => {
+    if (currentStepId !== 2) return
+    if (approveReceiptError && approveHash) {
+      updateStep(2, { 
+        status: "error", 
+        error: "Strategy approval failed",
+        txHash: approveHash,
+      })
+      setHasStartedApproval(false)
+    }
+  }, [approveReceiptError, approveHash, currentStepId])
+
+  // Handle successful approvals
+  useEffect(() => {
+    if (currentStepId !== 2 || !approveReceiptSuccess || !approveReceipt) return
+
     const nextIndex = approvalIndex + 1
     if (nextIndex < deployedAdapterAddresses.length) {
+      // Approve next strategy
       setApprovalIndex(nextIndex)
+      updateStep(2, { description: `Approving strategy ${nextIndex + 1} of ${deployedAdapterAddresses.length}...` })
+      
       approveStrategy({
         address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
         abi: VaultFactoryABI,
@@ -162,18 +291,28 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         args: [deployedAdapterAddresses[nextIndex]],
       })
     } else {
-      updateStep(2, { status: "success", description: `Approved ${deployedAdapterAddresses.length} strategies` })
+      // All strategies approved, move to step 3
+      updateStep(2, { 
+        status: "success", 
+        description: `Approved ${deployedAdapterAddresses.length} strategies`,
+        txHash: approveHash,
+      })
+      setHasStartedApproval(false)
       setCurrentStepId(3)
     }
-  }, [approveReceiptSuccess, approvalIndex, deployedAdapterAddresses, currentStepId])
+  }, [approveReceiptSuccess, approveReceipt, approvalIndex, deployedAdapterAddresses, currentStepId, approveStrategy, approveHash])
 
   // --- Step 3: Deploy Vault ---
-  const { writeContract: deployVault, data: vaultDeployHash, isPending: isDeployingVault, isSuccess: vaultDeploySuccess } = useWriteContract()
-  const { data: vaultReceipt, isSuccess: vaultReceiptSuccess } = useWaitForTransactionReceipt({ hash: vaultDeployHash })
+  const { writeContract: deployVault, data: vaultDeployHash, isPending: isDeployingVault } = useWriteContract()
+  const { data: vaultReceipt, isSuccess: vaultReceiptSuccess, isError: vaultReceiptError } = useWaitForTransactionReceipt({ hash: vaultDeployHash })
+
+  const [hasStartedVaultDeploy, setHasStartedVaultDeploy] = useState(false)
 
   useEffect(() => {
-    if (currentStepId === 3 && deployedAdapterAddresses.length > 0) {
-      updateStep(3, { status: "in_progress" })
+    if (currentStepId === 3 && deployedAdapterAddresses.length > 0 && !hasStartedVaultDeploy) {
+      setHasStartedVaultDeploy(true)
+      updateStep(3, { status: "in_progress", description: "Deploying managed vault..." })
+      
       deployVault({
         address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
         abi: VaultFactoryABI,
@@ -187,54 +326,145 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         ],
       })
     }
-  }, [currentStepId, deployedAdapterAddresses, vaultConfig])
+  }, [currentStepId, deployedAdapterAddresses, hasStartedVaultDeploy, vaultConfig, deployVault])
 
+  // Handle vault deployment errors
   useEffect(() => {
     if (currentStepId !== 3) return
-    if (!vaultReceiptSuccess || !vaultReceipt) return
-
-    // Parse the vault address from the event (VaultDeployed event in VaultFactory)
-    // For now, we'll assume it's in the logs. In production, parse the event properly.
-    // Placeholder: extract from logs or use a different method
-    const vaultAddress = "0x..." as Address // TODO: Parse from VaultDeployed event
-
-    setDeployedVaultAddress(vaultAddress)
-    updateStep(3, { status: "success", deployedAddresses: [vaultAddress], description: "Vault deployed successfully" })
-    setCurrentStepId(4)
-  }, [vaultReceiptSuccess, vaultReceipt, currentStepId])
-
-  // --- Step 4: Final Configuration ---
-  const { writeContract: setVault, data: setVaultHash, isPending: isSettingVault, isSuccess: setVaultSuccess } = useWriteContract()
-  const { data: setVaultReceipt, isSuccess: setVaultReceiptSuccess } = useWaitForTransactionReceipt({ hash: setVaultHash })
-
-  const { writeContract: setBuffer, data: setBufferHash, isPending: isSettingBuffer, isSuccess: setBufferSuccess } = useWriteContract()
-  const { data: setBufferReceipt, isSuccess: setBufferReceiptSuccess } = useWaitForTransactionReceipt({ hash: setBufferHash })
-
-  const [configIndex, setConfigIndex] = useState(0)
+    if (vaultReceiptError && vaultDeployHash) {
+      updateStep(3, { 
+        status: "error", 
+        error: "Vault deployment failed",
+        txHash: vaultDeployHash,
+      })
+      setHasStartedVaultDeploy(false)
+    }
+  }, [vaultReceiptError, vaultDeployHash, currentStepId])
 
   useEffect(() => {
-    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && configIndex === 0) {
-      updateStep(4, { status: "in_progress" })
+    if (currentStepId !== 3 || !vaultReceiptSuccess || !vaultReceipt) return
+
+    // Parse the vault address from the VaultDeployed event logs
+    try {
+      // VaultDeployed(address indexed vault, address indexed asset, address indexed owner)
+      const vaultDeployedEvent = vaultReceipt.logs.find((log: any) => 
+        log.topics[0] === '0x...' // VaultDeployed event signature hash - we need to find this in logs
+      )
+      
+      // For now, check all logs for a contract creation or look for the vault address
+      // The vault address should be in one of the log topics
+      let vaultAddress: Address | null = null
+      
+      // Try to find the deployed vault address from logs
+      // Since deployVault returns ManagedVault, the vault address might be in the return data
+      // or we can look at the last topic which is usually the deployed contract address
+      for (const log of vaultReceipt.logs) {
+        // Look for VaultDeployed event - topic[1] is the vault address (first indexed param)
+        if (log.topics.length >= 2) {
+          const potentialVaultAddr = `0x${log.topics[1].slice(26)}` as Address
+          if (potentialVaultAddr && potentialVaultAddr !== "0x0000000000000000000000000000000000000000") {
+            vaultAddress = potentialVaultAddr
+            break
+          }
+        }
+      }
+
+      if (!vaultAddress) {
+        throw new Error("Could not parse vault address from transaction receipt")
+      }
+
+      setDeployedVaultAddress(vaultAddress)
+      updateStep(3, { 
+        status: "success", 
+        deployedAddresses: [vaultAddress], 
+        description: "Vault deployed successfully",
+        txHash: vaultDeployHash,
+      })
+      setHasStartedVaultDeploy(false)
+      setCurrentStepId(4)
+    } catch (error: any) {
+      updateStep(3, { 
+        status: "error", 
+        error: `Failed to parse vault address: ${error.message}`,
+        txHash: vaultDeployHash,
+      })
+      setHasStartedVaultDeploy(false)
+    }
+  }, [vaultReceiptSuccess, vaultReceipt, currentStepId, vaultDeployHash])
+
+  // --- Step 4: Final Configuration ---
+  const { writeContract: configureContract, data: configHash, isPending: isConfiguring } = useWriteContract()
+  const { data: configReceipt, isSuccess: configReceiptSuccess, isError: configReceiptError } = useWaitForTransactionReceipt({ hash: configHash })
+
+  const [configIndex, setConfigIndex] = useState(0)
+  const [hasStartedConfig, setHasStartedConfig] = useState(false)
+  const [isConfiguringBuffer, setIsConfiguringBuffer] = useState(false)
+  const [lastProcessedConfigTx, setLastProcessedConfigTx] = useState<string | null>(null)
+
+  // Start configuration when entering step 4
+  useEffect(() => {
+    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && !hasStartedConfig) {
+      setHasStartedConfig(true)
+      setConfigIndex(0)
+      updateStep(4, { status: "in_progress", description: `Configuring adapter 1 of ${deployedAdapterAddresses.length}...` })
+      
       // Call setVault on first adapter
-      const adapterABI = vaultConfig.selectedStrategies[configIndex] === "compound-v3" ? StrategyAdapterCompoundIIIABI : StrategyAdapterSolanaABI
-      setVault({
-        address: deployedAdapterAddresses[configIndex],
+      const adapterABI = vaultConfig.selectedStrategies[0] === "compound-v3" ? StrategyAdapterCompoundIIIABI : StrategyAdapterSolanaABI
+      configureContract({
+        address: deployedAdapterAddresses[0],
         abi: adapterABI,
         functionName: "setVault",
         args: [deployedVaultAddress],
       })
     }
-  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, configIndex])
+  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, hasStartedConfig, vaultConfig, configureContract])
 
+  // Handle configuration errors
   useEffect(() => {
     if (currentStepId !== 4) return
-    if (!setVaultReceiptSuccess) return
+    if (configReceiptError && configHash) {
+      updateStep(4, { 
+        status: "error", 
+        error: "Configuration failed",
+        txHash: configHash,
+      })
+      setHasStartedConfig(false)
+    }
+  }, [configReceiptError, configHash, currentStepId])
+
+  // Handle successful configurations
+  useEffect(() => {
+    if (currentStepId !== 4 || !configReceiptSuccess || !configReceipt || !configHash) return
+    
+    // Prevent processing the same transaction twice
+    if (lastProcessedConfigTx === configHash) return
+    setLastProcessedConfigTx(configHash)
 
     const nextIndex = configIndex + 1
+    
+    // If we're currently setting the buffer, don't do anything else
+    if (isConfiguringBuffer) {
+      // Buffer configuration complete
+      updateStep(4, { 
+        status: "success", 
+        description: "Configuration complete!",
+        txHash: configHash,
+      })
+      setHasStartedConfig(false)
+      setIsConfiguringBuffer(false)
+      if (deployedVaultAddress) {
+        onComplete(deployedVaultAddress)
+      }
+      return
+    }
+    
     if (nextIndex < deployedAdapterAddresses.length) {
+      // Configure next adapter
       setConfigIndex(nextIndex)
+      updateStep(4, { description: `Configuring adapter ${nextIndex + 1} of ${deployedAdapterAddresses.length}...` })
+      
       const adapterABI = vaultConfig.selectedStrategies[nextIndex] === "compound-v3" ? StrategyAdapterCompoundIIIABI : StrategyAdapterSolanaABI
-      setVault({
+      configureContract({
         address: deployedAdapterAddresses[nextIndex],
         abi: adapterABI,
         functionName: "setVault",
@@ -242,24 +472,20 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
       })
     } else {
       // All adapters configured, now set liquidity buffer
-      setBuffer({
+      setIsConfiguringBuffer(true)
+      setConfigIndex(nextIndex)
+      updateStep(4, { description: "Setting liquidity buffer..." })
+      
+      configureContract({
         address: deployedVaultAddress!,
-        abi: VaultFactoryABI, // Assuming ManagedVault ABI includes setLiquidityBuffer
+        abi: ManagedVaultABI,
         functionName: "setLiquidityBuffer",
         args: [vaultConfig.liquidityBuffer],
       })
     }
-  }, [setVaultReceiptSuccess, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig])
+  }, [configReceiptSuccess, configReceipt, configHash, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig, configureContract, lastProcessedConfigTx, isConfiguringBuffer, onComplete])
 
-  useEffect(() => {
-    if (currentStepId !== 4) return
-    if (!setBufferReceiptSuccess) return
-
-    updateStep(4, { status: "success", description: "Configuration complete!" })
-    if (deployedVaultAddress) {
-      onComplete(deployedVaultAddress)
-    }
-  }, [setBufferReceiptSuccess, deployedVaultAddress, onComplete, currentStepId])
+  // This effect is now handled inline in the previous effect
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -350,10 +576,14 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
             </Button>
           )}
 
-          {currentStepId === 1 && steps[0].status === "pending" && (
-            <Button onClick={handleDeployAdapters} disabled={isDeployingCompound || isDeployingSolana}>
-              {(isDeployingCompound || isDeployingSolana) ? (
+          {currentStepId === 1 && (steps[0].status === "pending" || steps[0].status === "error") && (
+            <Button onClick={handleDeployAdapters} disabled={isDeploying || !isConnected} variant={steps[0].status === "error" ? "default" : "default"}>
+              {isDeploying ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deploying...</>
+              ) : !isConnected ? (
+                "Connect Wallet First"
+              ) : steps[0].status === "error" ? (
+                "Retry Deployment"
               ) : (
                 "Deploy Adapters"
               )}
