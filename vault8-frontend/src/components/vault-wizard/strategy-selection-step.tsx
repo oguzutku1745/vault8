@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -25,7 +23,7 @@ interface StrategySelectionStepProps {
 export function StrategySelectionStep({ selectedStrategies, selectedChains, onStrategyToggle }: StrategySelectionStepProps) {
   const strategies: Strategy[] = [
     {
-      id: "compound-base",
+      id: "compound-v3",
       name: "Compound V3",
       protocol: "Compound",
       chain: "base",
@@ -33,7 +31,7 @@ export function StrategySelectionStep({ selectedStrategies, selectedChains, onSt
       status: "active",
     },
     {
-      id: "jupiter-solana",
+      id: "jupiter",
       name: "Jupiter Aggregator",
       protocol: "Jupiter",
       chain: "solana",

@@ -1,22 +1,25 @@
-"use client"
-
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
+import { Input } from "@/components/ui/input"
 import { Info } from "lucide-react"
+import { useAppKitAccount } from "@reown/appkit/react"
 
-interface LiquidityBufferStepProps {
+interface BufferOwnerStepProps {
   liquidityBuffer: number
   onBufferChange: (value: number) => void
+  vaultOwner: string
+  onOwnerChange: (value: string) => void
 }
 
-export function LiquidityBufferStep({ liquidityBuffer, onBufferChange }: LiquidityBufferStepProps) {
+export function BufferOwnerStep({ liquidityBuffer, onBufferChange, vaultOwner, onOwnerChange }: BufferOwnerStepProps) {
+  const { address } = useAppKitAccount()
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Set Liquidity Buffer</h2>
+        <h2 className="text-2xl font-bold mb-2">Buffer & Ownership</h2>
         <p className="text-muted-foreground">
-          Reserve a percentage of funds for instant withdrawals without rebalancing
+          Set liquidity buffer and specify the vault owner
         </p>
       </div>
 
@@ -52,7 +55,7 @@ export function LiquidityBufferStep({ liquidityBuffer, onBufferChange }: Liquidi
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="p-4">
           <div className="flex gap-3">
-            <Info className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <div className="space-y-2 text-sm">
               <p className="font-medium text-foreground">What is a liquidity buffer?</p>
               <p className="text-muted-foreground">
@@ -64,6 +67,41 @@ export function LiquidityBufferStep({ liquidityBuffer, onBufferChange }: Liquidi
                 <strong>Recommended:</strong> 10-20% for balanced performance
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Vault Owner Section */}
+      <Card className="border-border bg-card mt-6">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="vault-owner" className="text-base font-semibold">
+                Vault Owner Address
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1 mb-3">
+                The address that will have full control over the vault
+              </p>
+            </div>
+
+            <Input
+              id="vault-owner"
+              type="text"
+              placeholder="0x..."
+              value={vaultOwner}
+              onChange={(e) => onOwnerChange(e.target.value)}
+              className="font-mono text-sm"
+            />
+
+            {address && (
+              <button
+                type="button"
+                onClick={() => onOwnerChange(address)}
+                className="text-sm text-primary hover:underline"
+              >
+                Use my address ({address.slice(0, 6)}...{address.slice(-4)})
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>

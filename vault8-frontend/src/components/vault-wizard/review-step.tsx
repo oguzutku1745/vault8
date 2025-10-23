@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChainBadge } from "@/components/chain-badge"
 import { CheckCircle2 } from "lucide-react"
@@ -12,8 +10,8 @@ interface ReviewStepProps {
 
 export function ReviewStep({ selectedChains, selectedStrategies, liquidityBuffer }: ReviewStepProps) {
   const strategyNames: Record<string, string> = {
-    "compound-base": "Compound V3 (Base)",
-    "jupiter-solana": "Jupiter Aggregator (Solana)",
+    "compound-v3": "Compound V3 (Base)",
+    "jupiter": "Jupiter Aggregator (Solana)",
     "morpho-base": "Morpho Blue (Base)",
     "yearn-base": "Yearn V3 (Base)",
     "aave-base": "Aave V3 (Base)",
@@ -72,7 +70,7 @@ export function ReviewStep({ selectedChains, selectedStrategies, liquidityBuffer
         <Card className="border-success/20 bg-success/5">
           <CardContent className="p-4">
             <div className="flex gap-3">
-              <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
               <div className="space-y-1 text-sm">
                 <p className="font-medium text-foreground">Ready to Deploy</p>
                 <p className="text-muted-foreground">

@@ -1,21 +1,18 @@
-"use client"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StepIndicator } from "@/components/step-indicator"
 import { ChainSelectionStep } from "./chain-selection-step"
 import { StrategySelectionStep } from "./strategy-selection-step"
-import { LiquidityBufferStep } from "./liquidity-buffer-step"
+import { BufferOwnerStep } from "./liquidity-buffer-step"
 import { ReviewStep } from "./review-step"
-import { AllocateFundsModal } from "./allocate-funds-modal"
+import { DeploymentFlowModal } from "./deployment-flow-modal"
 import { ArrowLeft, ArrowRight, Rocket } from "lucide-react"
-import { LoadingSpinner } from "@/components/loading-spinner"
 
 const steps = [
   { label: "Chains", description: "Select networks" },
   { label: "Strategies", description: "Choose protocols" },
-  { label: "Buffer", description: "Set liquidity" },
+  { label: "Buffer & Owner", description: "Set liquidity & owner" },
   { label: "Review", description: "Confirm & deploy" },
 ]
 
@@ -24,8 +21,8 @@ export function VaultCreationWizard() {
   const [selectedChains, setSelectedChains] = useState<("base" | "solana")[]>(["base"])
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([])
   const [liquidityBuffer, setLiquidityBuffer] = useState(15)
-  const [isDeploying, setIsDeploying] = useState(false)
-  const [showAllocateModal, setShowAllocateModal] = useState(false)
+  const [vaultOwner, setVaultOwner] = useState("")
+  const [showDeploymentModal, setShowDeploymentModal] = useState(false)
 
   const handleChainToggle = (chain: "base" | "solana") => {
     if (chain === "base") return // Base is required
@@ -38,22 +35,20 @@ export function VaultCreationWizard() {
     )
   }
 
-  const handleDeploy = async () => {
-    setIsDeploying(true)
-    // Simulate deployment
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsDeploying(false)
-    setShowAllocateModal(true)
+  const handleDeploy = () => {
+    setShowDeploymentModal(true)
   }
 
-  const handleAllocate = (baseAmount: number, solanaAmount: number) => {
-    console.log("Allocating:", { baseAmount, solanaAmount })
-    // Handle allocation logic
+  const handleDeploymentComplete = (vaultAddress: string) => {
+    console.log("Vault deployed at:", vaultAddress)
+    // Optionally navigate to the new vault or show success message
+    setShowDeploymentModal(false)
   }
 
   const canProceed = () => {
     if (currentStep === 1) return selectedChains.length > 0
     if (currentStep === 2) return selectedStrategies.length > 0
+    if (currentStep === 3) return vaultOwner.length > 0 && vaultOwner.startsWith("0x")
     return true
   }
 
@@ -63,7 +58,7 @@ export function VaultCreationWizard() {
         <StepIndicator steps={steps} currentStep={currentStep} />
 
         <Card className="border-border bg-card">
-          <CardContent className="p-8">
+          <CardContent className="p-8" key={`step-${currentStep}`}>
             {currentStep === 1 && (
               <ChainSelectionStep selectedChains={selectedChains} onChainToggle={handleChainToggle} />
             )}
@@ -75,7 +70,12 @@ export function VaultCreationWizard() {
               />
             )}
             {currentStep === 3 && (
-              <LiquidityBufferStep liquidityBuffer={liquidityBuffer} onBufferChange={setLiquidityBuffer} />
+              <BufferOwnerStep 
+                liquidityBuffer={liquidityBuffer} 
+                onBufferChange={setLiquidityBuffer}
+                vaultOwner={vaultOwner}
+                onOwnerChange={setVaultOwner}
+              />
             )}
             {currentStep === 4 && (
               <ReviewStep
@@ -91,7 +91,7 @@ export function VaultCreationWizard() {
           <Button
             variant="outline"
             onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-            disabled={currentStep === 1 || isDeploying}
+            disabled={currentStep === 1}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
@@ -105,26 +105,28 @@ export function VaultCreationWizard() {
           ) : (
             <Button
               onClick={handleDeploy}
-              disabled={isDeploying}
+              disabled={!canProceed()}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              {isDeploying ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Deploying...
-                </>
-              ) : (
-                <>
-                  <Rocket className="mr-2 h-4 w-4" />
-                  Deploy Vault
-                </>
-              )}
+              <Rocket className="mr-2 h-4 w-4" />
+              Deploy Vault
             </Button>
           )}
         </div>
       </div>
 
-      <AllocateFundsModal open={showAllocateModal} onOpenChange={setShowAllocateModal} onAllocate={handleAllocate} />
+      <DeploymentFlowModal 
+        open={showDeploymentModal} 
+        onOpenChange={setShowDeploymentModal}
+        vaultConfig={{
+          selectedStrategies,
+          liquidityBuffer,
+          vaultOwner,
+          vaultName: "My Vault", // TODO: Add vault name/symbol input
+          vaultSymbol: "MV",
+        }}
+        onComplete={handleDeploymentComplete}
+      />
     </>
   )
 }
