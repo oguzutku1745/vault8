@@ -13,6 +13,10 @@ contract VaultFactory is Ownable {
     // Track all deployed vaults
     address[] public allVaults;
 
+    // Track vault owners
+    mapping(address => address[]) private ownerVaults;
+    mapping(address => address) private vaultOwners;
+
     event StrategyApproved(address indexed strategy);
     event StrategyRevoked(address indexed strategy);
     event VaultDeployed(address indexed vault, address indexed asset, address indexed owner);
@@ -61,6 +65,8 @@ contract VaultFactory is Ownable {
         vault = new ManagedVault(asset, name, symbol, vaultOwner, selectedStrategies);
 
         allVaults.push(address(vault));
+        ownerVaults[vaultOwner].push(address(vault));
+        vaultOwners[address(vault)] = vaultOwner;
         emit VaultDeployed(address(vault), address(asset), vaultOwner);
     }
 
@@ -73,5 +79,13 @@ contract VaultFactory is Ownable {
 
     function getAllVaults() external view returns (address[] memory) {
         return allVaults;
+    }
+
+    function getVaultsByOwner(address owner) external view returns (address[] memory) {
+        return ownerVaults[owner];
+    }
+
+    function getVaultOwner(address vault) external view returns (address) {
+        return vaultOwners[vault];
     }
 }
