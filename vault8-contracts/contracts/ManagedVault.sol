@@ -26,6 +26,7 @@ contract ManagedVault is ERC4626, Ownable {
     // Track total assets allocated to strategies
     uint256 public investedAssets;
     uint256 private _lastSyncTimestamp; // block timestamp of the most recent sync
+    uint8 private _liquidityBuffer; // percentage of assets to keep liquid (0-100)
 
     address[] private _allowedStrategies;            // ordered list for enumeration
     mapping(address => bool) private _isAllowedStrategy; // quick lookup for checks
@@ -119,6 +120,11 @@ contract ManagedVault is ERC4626, Ownable {
         return _lastSyncTimestamp;
     }
 
+    /// @notice Set the liquidity buffer percentage (0-100)
+    function setLiquidityBuffer(uint8 bufferPercent) external onlyOwner {
+        require(bufferPercent <= 100, "ManagedVault: invalid buffer");
+        _liquidityBuffer = bufferPercent;
+    }
 
     // dynamic, calls the strategy address for the current balance
     function strategyBalance(IStrategy strategy) external view returns (uint256) {
