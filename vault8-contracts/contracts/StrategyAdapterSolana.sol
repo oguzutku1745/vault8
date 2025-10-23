@@ -35,6 +35,7 @@ contract StrategyAdapterSolana is IStrategy {
     IERC20 public immutable asset;
     IMyOAppBridge public immutable myOApp;
     uint32 public immutable dstEid;
+    uint256 private _mintedAmount;
 
     address public vault;
     bool public isSealed;
@@ -53,7 +54,6 @@ contract StrategyAdapterSolana is IStrategy {
     error PendingBridge();
     error BridgeMissing();
     error AmountMismatch();
-    error WithdrawUnsupported();
 
     constructor(IERC20 asset_, IMyOAppBridge myOApp_, uint32 dstEid_, bytes memory options_) {
         if (address(asset_) == address(0) || address(myOApp_) == address(0)) revert ZeroAddress();
@@ -101,6 +101,7 @@ contract StrategyAdapterSolana is IStrategy {
         (uint256 mintedAmount, uint64 recordedNonce) = myOApp.getPendingDeposit(address(this));
         if (recordedNonce != nonce || mintedAmount == 0) revert AmountMismatch();
 
+        _mintedAmount += mintedAmount;
         bytes32 key = _bridgeKey(vault, nonce);
         if (bridged[key] != 0) revert PendingBridge();
         bridged[key] = mintedAmount;
@@ -131,16 +132,17 @@ contract StrategyAdapterSolana is IStrategy {
         emit DepositRequested(vault, nonce, receipt.guid, amount);
     }
 
-    function withdraw(uint256, address) external pure override {
-        revert WithdrawUnsupported();
+    function withdraw(uint256 amount, address senderVault) external override {
+        if (msg.sender != senderVault) revert NotVault();
+        if (amount == 0) revert AmountMismatch();
+        _mintedAmount -= amount;
     }
 
     /**
      * @notice Reports the currently pending bridged amount (net minted).
      */
     function balance() external view override returns (uint256) {
-        (uint256 pendingAmount, ) = myOApp.getPendingDeposit(address(this));
-        return pendingAmount;
+        return _mintedAmount;
     }
 
     function pendingBridge() external view returns (uint256 amount, uint64 nonce, bytes32 key) {
