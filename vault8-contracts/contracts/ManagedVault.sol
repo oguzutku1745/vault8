@@ -126,6 +126,11 @@ contract ManagedVault is ERC4626, Ownable {
         _liquidityBuffer = bufferPercent;
     }
 
+    /// @notice Get the current liquidity buffer percentage
+    function liquidityBuffer() external view returns (uint8) {
+        return _liquidityBuffer;
+    }
+
     // dynamic, calls the strategy address for the current balance
     function strategyBalance(IStrategy strategy) external view returns (uint256) {
         return strategy.balance();
