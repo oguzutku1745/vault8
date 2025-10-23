@@ -35,11 +35,13 @@ export function AllocateFundsModal({ open, onOpenChange, onAllocate }: AllocateF
 
         <Tabs defaultValue="base" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="base">
-              <ChainBadge chain="base" size="sm" />
+            <TabsTrigger value="base" className="gap-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-xs font-bold">B</span>
+              Base
             </TabsTrigger>
-            <TabsTrigger value="solana">
-              <ChainBadge chain="solana" size="sm" />
+            <TabsTrigger value="solana" className="gap-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-secondary/20 text-secondary text-xs font-bold">S</span>
+              Solana
             </TabsTrigger>
           </TabsList>
 
@@ -99,7 +101,7 @@ export function AllocateFundsModal({ open, onOpenChange, onAllocate }: AllocateF
             <Card className="border-secondary/20 bg-secondary/5">
               <CardContent className="p-4">
                 <div className="flex gap-3">
-                  <Info className="h-5 w-5 text-secondary flex-shrink-0 mt-0.5" />
+                  <Info className="h-5 w-5 text-secondary shrink-0 mt-0.5" />
                   <div className="space-y-1 text-sm">
                     <p className="font-medium text-foreground">Cross-Chain Bridge</p>
                     <p className="text-muted-foreground">

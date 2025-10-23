@@ -18,10 +18,11 @@ interface Strategy {
 
 interface StrategySelectionStepProps {
   selectedStrategies: string[]
+  selectedChains: ("base" | "solana")[]
   onStrategyToggle: (strategyId: string) => void
 }
 
-export function StrategySelectionStep({ selectedStrategies, onStrategyToggle }: StrategySelectionStepProps) {
+export function StrategySelectionStep({ selectedStrategies, selectedChains, onStrategyToggle }: StrategySelectionStepProps) {
   const strategies: Strategy[] = [
     {
       id: "compound-base",
@@ -73,6 +74,9 @@ export function StrategySelectionStep({ selectedStrategies, onStrategyToggle }: 
     },
   ]
 
+  // Filter strategies based on selected chains
+  const availableStrategies = strategies.filter((strategy) => selectedChains.includes(strategy.chain))
+
   return (
     <div className="space-y-4">
       <div className="mb-6">
@@ -81,7 +85,7 @@ export function StrategySelectionStep({ selectedStrategies, onStrategyToggle }: 
       </div>
 
       <div className="grid gap-4">
-        {strategies.map((strategy) => {
+        {availableStrategies.map((strategy) => {
           const isSelected = selectedStrategies.includes(strategy.id)
           const isDisabled = strategy.status === "coming-soon"
 
