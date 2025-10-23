@@ -52,17 +52,26 @@ contract VaultFactory is Ownable {
         string calldata name,
         string calldata symbol,
         address vaultOwner,
-        address[] calldata selectedStrategies
+        address[] calldata selectedStrategies,
+        uint8 initialLiquidityBuffer
     ) external onlyOwner returns (ManagedVault vault) {
         require(vaultOwner != address(0), "VaultFactory: zero owner");
         require(selectedStrategies.length > 0, "VaultFactory: no strategies selected");
+        require(initialLiquidityBuffer <= 100, "VaultFactory: invalid buffer");
 
         // Validate each selected strategy is globally approved
         for (uint256 i = 0; i < selectedStrategies.length; ++i) {
             require(isApprovedStrategy[selectedStrategies[i]], "unapproved strategy");
         }
 
-        vault = new ManagedVault(asset, name, symbol, vaultOwner, selectedStrategies);
+        vault = new ManagedVault(
+            asset,
+            name,
+            symbol,
+            vaultOwner,
+            selectedStrategies,
+            initialLiquidityBuffer
+        );
 
         allVaults.push(address(vault));
         ownerVaults[vaultOwner].push(address(vault));

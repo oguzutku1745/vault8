@@ -35,7 +35,9 @@ export function Header() {
               Marketplace
             </Link>
             <a
-              href="#docs"
+              href="https://github.com/oguzutku1745/vault8"
+              target="_blank"
+              rel="noreferrer"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Docs

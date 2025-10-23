@@ -37,12 +37,16 @@ contract ManagedVault is ERC4626, Ownable {
         string memory name_,
         string memory symbol_,
         address initialOwner,
-        address[] memory allowedStrategies_
+        address[] memory allowedStrategies_,
+        uint8 initialLiquidityBuffer
     )
         ERC20(name_, symbol_)
         ERC4626(asset_)
         Ownable(initialOwner)
     {
+        require(initialLiquidityBuffer <= 100, "ManagedVault: invalid buffer");
+        _liquidityBuffer = initialLiquidityBuffer;
+
         // store allowed strategies + mapping
         for (uint i = 0; i < allowedStrategies_.length; ++i) {
             address strat = allowedStrategies_[i];
