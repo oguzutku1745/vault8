@@ -9,6 +9,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IStrategy} from "./IStrategy.sol";
 import {IStrategy4626Adapter} from "./StrategyAdapter4626.sol";
 
+/// tiny helper interface for adapters that expose setVault(...)
+interface ISetVault {
+    function setVault(address) external;
+}
+
 contract ManagedVault is ERC4626, Ownable {
     using SafeERC20 for IERC20;
 
@@ -48,15 +53,20 @@ contract ManagedVault is ERC4626, Ownable {
         require(amount <= vaultToken.balanceOf(address(this)), "Not enough free assets");
         require(amount > 0, "Zero amount");
 
+        // try to bind adapter to this vault if it exposes setVault(...)
+        // (this is optional and will silently continue on adapters that don't implement it)
+        try ISetVault(address(strategy)).setVault(address(this)) {
+        } catch {
+        }
+
         // Approve and deposit into strategy
         SafeERC20.forceApprove(vaultToken, address(strategy), amount);
         strategy.deposit(amount);
 
-        //PROBABLY BETTER WAY TO DO THIS
-        //CHECK
+        // Give adapter permission to burn our ERC4626 shares for future recalls (if adapter is 4626)
         try IStrategy4626Adapter(address(strategy)).target() returns (address shareToken) {
-        // Give adapter permission to burn our ERC4626 shares for future recalls
-        IERC20(shareToken).approve(address(strategy), type(uint256).max);
+            // use forceApprove to handle non-standard tokens / pre-existing allowances
+            SafeERC20.forceApprove(IERC20(shareToken), address(strategy), type(uint256).max);
         } catch {
             // non-ERC4626 adapters ignore
         }
@@ -66,16 +76,17 @@ contract ManagedVault is ERC4626, Ownable {
         investedAssets += amount;
     }
 
-    /// @notice Recall funds from a strategy back to the vault (owner-only)
-    function recall(uint256 amount, IStrategy strategy) external onlyOwner {
-        require(_isAllowedStrategy[address(strategy)], "ManagedVault: not allowed strategy");
-        require(amount > 0, "Zero amount");
-        require(amount <= investedAssets, "Not enough invested assets");
+    /// @notice Recall funds from a strategy back into the vault (owner-only)
+    function recall(uint256 amount, address strategy) external onlyOwner {
+        require(_isAllowedStrategy[strategy], "ManagedVault: strategy not allowed");
+        require(amount > 0, "ManagedVault: zero amount");
+        require(strategyBalances[strategy] >= amount, "ManagedVault: amount too large");
 
-        // Withdraw from strategy to this vault
-        strategy.withdraw(amount, address(this));
+        // call strategy to withdraw assets back to this vault
+        IStrategy(strategy).withdraw(amount, address(this));
 
-        strategyBalances[address(strategy)] -= amount;
+        // update accounting
+        strategyBalances[strategy] -= amount;
         investedAssets -= amount;
     }
 
