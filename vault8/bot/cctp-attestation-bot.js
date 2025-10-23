@@ -34,8 +34,8 @@ const TOKEN_MESSENGER_MINTER_PROGRAM_ID = new PublicKey("CCTPV2vPZJS2u2BBsUoscui
 const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
 // Bot State
-const processedNonces = new Set();
-const STATE_FILE = "bot/processed-nonces.json";
+const processedTxs = new Set();
+const STATE_FILE = "bot/processed-transactions.json";
 
 // ==================== Initialization ====================
 
@@ -43,8 +43,8 @@ function loadState() {
     if (fs.existsSync(STATE_FILE)) {
         try {
             const data = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-            data.forEach(nonce => processedNonces.add(nonce));
-            console.log(`📂 Loaded ${processedNonces.size} processed nonces from state file`);
+            data.forEach(txHash => processedTxs.add(txHash));
+            console.log(`📂 Loaded ${processedTxs.size} processed transactions from state file`);
         } catch (e) {
             console.error("⚠️  Failed to load state file:", e.message);
         }
@@ -54,7 +54,7 @@ function loadState() {
 function saveState() {
     try {
         fs.mkdirSync("bot", { recursive: true });
-        fs.writeFileSync(STATE_FILE, JSON.stringify([...processedNonces], null, 2));
+        fs.writeFileSync(STATE_FILE, JSON.stringify([...processedTxs], null, 2));
     } catch (e) {
         console.error("⚠️  Failed to save state file:", e.message);
     }
@@ -308,9 +308,9 @@ async function handleCctpDeposit(event, provider, connection, payer) {
     console.log("TX Hash:", txHash);
     console.log("═".repeat(60));
     
-    // Check if already processed
-    if (processedNonces.has(nonceStr)) {
-        console.log("⏭️  Skipping: Nonce already processed\n");
+    // Check if already processed by transaction hash
+    if (processedTxs.has(txHash)) {
+        console.log("⏭️  Skipping: Transaction already processed\n");
         return;
     }
     
@@ -327,8 +327,8 @@ async function handleCctpDeposit(event, provider, connection, payer) {
         console.log("   Transaction:", signature);
         console.log("   Explorer: https://explorer.solana.com/tx/" + signature + "?cluster=devnet");
         
-        // Mark as processed
-        processedNonces.add(nonceStr);
+        // Mark as processed by transaction hash
+        processedTxs.add(txHash);
         saveState();
         
         console.log("\n✅ CCTP deposit processed successfully");
@@ -340,8 +340,8 @@ async function handleCctpDeposit(event, provider, connection, payer) {
         
         // Check if it's a nonce reuse error (already processed by someone else)
         if (error.logs && error.logs.some(log => log.includes('already in use'))) {
-            console.log("ℹ️  Nonce already used - marking as processed");
-            processedNonces.add(nonceStr);
+            console.log("ℹ️  Transaction already claimed - marking as processed");
+            processedTxs.add(txHash);
             saveState();
         } else {
             console.error("   This deposit will be retried on bot restart\n");

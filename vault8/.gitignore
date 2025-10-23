@@ -32,4 +32,5 @@ pnpm-error.log
 # Bot sensitive files
 bot/bot-keypair.json
 bot/processed-nonces.json
+bot/processed-transactions.json
 cctp-attestation.json

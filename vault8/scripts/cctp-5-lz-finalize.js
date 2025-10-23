@@ -30,6 +30,11 @@ async function main() {
     // Get MyOApp contract
     const myOApp = await ethers.getContractAt("MyOApp", MYOAPP_ADDRESS);
     
+    const options = Options.newOptions()
+    .addExecutorLzReceiveOption(600000, 3_000_000) // 600k CU, 3M lamports
+    .toHex();
+
+    console.log('options', options);
     // Check pending deposit
     const pending = await myOApp.getPendingDeposit(signer.address);
     if (pending[0].toString() === "0") {
@@ -43,9 +48,7 @@ async function main() {
     console.log("   CCTP Nonce:", pending[1].toString());
     
     // Build LayerZero options
-    const options = Options.newOptions()
-        .addExecutorLzReceiveOption(600000, 3_000_000) // 600k CU, 3M lamports
-        .toHex();
+
     
     console.log("\n⏳ Quoting LayerZero fee...");
     const fee = await myOApp.quoteDeposit(SOLANA_EID, options, false);

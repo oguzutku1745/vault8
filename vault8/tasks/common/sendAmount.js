@@ -16,6 +16,8 @@ const action = async ({ dstEid, amountBaseUnits, contractName, lzReceiveGas, com
         .addExecutorComposeOption(0, composeGas, 0) // index 0 compose
         .toHex()
         .toString();
+
+    console.log('options', options);
     // Quote fees
     const [nativeFee] = await myOApp.quoteDeposit(dstEid, amt, options, false);
     console.log('🔖 Native fee quoted:', nativeFee.toString());
