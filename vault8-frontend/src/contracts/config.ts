@@ -15,48 +15,34 @@ export const CONTRACT_ADDRESSES = {
 } as const;
 
 /**
- * Strategy mappings - hardcoded for known strategies
+ * Target protocol addresses (NOT the adapters - these are the protocols we interact with)
  */
-export const STRATEGY_ADDRESSES = {
-  COMPOUND_V3: "0x05f26c54f38EFC305438AEfc4Aeec903Ad4bb6ce",
-  JUPITER: "0x0D7FBc907154De84897d9E0Db4B99C391A529488", // MyOApp (Solana bridge)
+export const TARGET_PROTOCOLS = {
+  COMPOUND_V3_COMET: "0x05f26c54f38EFC305438AEfc4Aeec903Ad4bb6ce", // Compound V3 Comet on Base Sepolia
+  MYOAPP_BRIDGE: "0x0D7FBc907154De84897d9E0Db4B99C391A529488", // MyOApp (Solana bridge)
+  SOLANA_DST_EID: 40168, // LayerZero Solana endpoint ID
+  DEFAULT_LZ_OPTIONS: "0x000301002101000000000000000000000000000927c0000000000000000000000000002dc6c0", // Default LayerZero execution options
 } as const;
 
-export const STRATEGY_METADATA = {
-  [STRATEGY_ADDRESSES.COMPOUND_V3]: {
+/**
+ * Strategy metadata by ID
+ */
+export const STRATEGY_METADATA_BY_ID = {
+  "compound-v3": {
     id: "compound-v3",
     name: "Compound V3",
     protocol: "Compound",
     chain: "base" as const,
     status: "active" as const,
+    adapterType: "StrategyAdapterCompoundIII" as const,
   },
-  [STRATEGY_ADDRESSES.JUPITER]: {
+  "jupiter": {
     id: "jupiter",
     name: "Jupiter Aggregator",
     protocol: "Jupiter",
     chain: "solana" as const,
     status: "active" as const,
+    adapterType: "StrategyAdapterSolana" as const,
   },
 } as const;
-
-/**
- * Get strategy metadata by address
- */
-export function getStrategyMetadata(address: string) {
-  const normalized = address.toLowerCase();
-  const key = Object.keys(STRATEGY_METADATA).find(
-    (k) => k.toLowerCase() === normalized
-  );
-  return key ? STRATEGY_METADATA[key as keyof typeof STRATEGY_METADATA] : null;
-}
-
-/**
- * Get strategy address by ID
- */
-export function getStrategyAddress(strategyId: string): string | null {
-  const entry = Object.entries(STRATEGY_METADATA).find(
-    ([_, metadata]) => metadata.id === strategyId
-  );
-  return entry ? entry[0] : null;
-}
 

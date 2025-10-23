@@ -176,7 +176,7 @@ export default function DashboardPage() {
                       </div>
                     </Button>
 
-                    <Button 
+                    <Button       
                       variant="outline" 
                       className="h-auto flex-col gap-2 py-4 bg-transparent"
                       onClick={() => setShowAdjustBufferModal(true)}
