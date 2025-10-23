@@ -65,7 +65,7 @@ contract StrategyAdapterCompoundIII is IStrategy {
         }
     }
 
-    function deposit(uint256 amount) external override {
+    function deposit(uint256 amount) external payable override {
         if (msg.sender != vault) revert NotVault();
         require(amount > 0, "Adapter: zero amount");
 

@@ -14,11 +14,18 @@ interface ISetVault {
     function setVault(address) external;
 }
 
+/// minimal helper interface for Solana bridging strategies
+interface ISolanaBridgeStrategy {
+    function bridge(uint256 amount) external returns (uint64);
+    function setLayerZeroOptions(bytes calldata options) external;
+}
+
 contract ManagedVault is ERC4626, Ownable {
     using SafeERC20 for IERC20;
 
     // Track total assets allocated to strategies
     uint256 public investedAssets;
+    uint256 private _lastSyncTimestamp; // block timestamp of the most recent sync
 
     address[] private _allowedStrategies;            // ordered list for enumeration
     mapping(address => bool) private _isAllowedStrategy; // quick lookup for checks
@@ -46,7 +53,7 @@ contract ManagedVault is ERC4626, Ownable {
 
 
     /// @notice Allocate funds from vault to a strategy (owner-only)
-    function allocate(uint256 amount, IStrategy strategy) external onlyOwner {
+    function allocate(uint256 amount, IStrategy strategy) external payable onlyOwner {
         require(_isAllowedStrategy[address(strategy)], "ManagedVault: not allowed strategy");
 
         IERC20 vaultToken = IERC20(asset());
@@ -61,7 +68,7 @@ contract ManagedVault is ERC4626, Ownable {
 
         // Approve and deposit into strategy
         SafeERC20.forceApprove(vaultToken, address(strategy), amount);
-        strategy.deposit(amount);
+        strategy.deposit{value: msg.value}(amount);
 
         // Give adapter permission to burn our ERC4626 shares for future recalls (if adapter is 4626)
         try IStrategy4626Adapter(address(strategy)).target() returns (address shareToken) {
@@ -107,6 +114,11 @@ contract ManagedVault is ERC4626, Ownable {
         return investedAssets;
     }
 
+    /// @notice Returns the timestamp of the last syncInvestedAssets call
+    function lastSyncTimestamp() external view returns (uint256) {
+        return _lastSyncTimestamp;
+    }
+
 
     // dynamic, calls the strategy address for the current balance
     function strategyBalance(IStrategy strategy) external view returns (uint256) {
@@ -141,5 +153,33 @@ contract ManagedVault is ERC4626, Ownable {
         }
 
         investedAssets = total;
+        _lastSyncTimestamp = block.timestamp;
+    }
+
+    // ---------------------------------------------------------------------
+    // Solana bridge helpers
+    // ---------------------------------------------------------------------
+
+    /// @notice Trigger the CCTP bridge step on a Solana strategy.
+    function initiateBridge(address strategy, uint256 amount) external onlyOwner returns (uint64 nonce) {
+        require(_isAllowedStrategy[strategy], "ManagedVault: strategy not allowed");
+        require(amount > 0, "ManagedVault: zero amount");
+
+        // bind vault if adapter supports it
+        try ISetVault(strategy).setVault(address(this)) {
+        } catch {
+        }
+
+        IERC20 vaultToken = IERC20(asset());
+        require(amount <= vaultToken.balanceOf(address(this)), "Not enough free assets");
+
+        SafeERC20.forceApprove(vaultToken, strategy, amount);
+        nonce = ISolanaBridgeStrategy(strategy).bridge(amount);
+    }
+
+    /// @notice Update LayerZero execution options on a Solana strategy.
+    function configureBridgeOptions(address strategy, bytes calldata options) external onlyOwner {
+        require(_isAllowedStrategy[strategy], "ManagedVault: strategy not allowed");
+        ISolanaBridgeStrategy(strategy).setLayerZeroOptions(options);
     }
 }

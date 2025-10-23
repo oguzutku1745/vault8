@@ -20,7 +20,7 @@ contract StrategyAdapter4626 is IStrategy4626Adapter {
     // -------------------------------------------------------------
     // IStrategy
     // -------------------------------------------------------------
-    function deposit(uint256 amount) external override {
+    function deposit(uint256 amount) external payable override {
         address vault = msg.sender; // ManagedVault
 
         // 1️⃣ Pull tokens from the ManagedVault into adapter

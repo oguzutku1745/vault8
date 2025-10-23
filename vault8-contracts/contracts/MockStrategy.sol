@@ -16,7 +16,7 @@ contract MockStrategy is IStrategy {
     }
 
     // Vault deposits tokens into this strategy
-    function deposit(uint256 amount) external override {
+    function deposit(uint256 amount) external payable override {
         token.safeTransferFrom(msg.sender, address(this), amount);
         strategyBalance += amount;
     }
