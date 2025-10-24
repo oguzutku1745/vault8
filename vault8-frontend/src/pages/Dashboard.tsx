@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useAppKitAccount } from "@reown/appkit/react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -14,9 +14,11 @@ import { RebalanceModal } from "@/components/vault-operations/rebalance-modal"
 import { AdjustBufferModal } from "@/components/vault-operations/adjust-buffer-modal"
 import { AllocateFundsModal } from "@/components/vault-wizard/allocate-funds-modal"
 import { AddressDisplay } from "@/components/address-display"
-import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity, Wallet } from "lucide-react"
+import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity, Wallet, AlertTriangle } from "lucide-react"
 import { useOwnerVault } from "@/contracts/hooks/useFactoryRead"
+import { useLiquidityBuffer, useLastSyncTimestamp, useAllowedStrategies } from "@/contracts/hooks/useVaultRead"
 import { ADMIN_ADDRESS } from "@/contracts/config"
+import type { Address } from "viem"
 
 export default function DashboardPage() {
   const { address, isConnected } = useAppKitAccount()
@@ -35,12 +37,74 @@ export default function DashboardPage() {
   
   // Check if user is admin
   const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()
+  
+  // Read vault data (only when vault address exists)
+  const { liquidityBuffer: bufferFromContract, isLoading: isLoadingBuffer, refetch: refetchBuffer } = useLiquidityBuffer(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address
+  )
+  const { lastSyncTimestamp, isLoading: isLoadingSync, refetch: refetchSync } = useLastSyncTimestamp(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address
+  )
+  const { allowedStrategies, isLoading: isLoadingStrategies, refetch: refetchStrategies } = useAllowedStrategies(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address
+  )
+  
+  // Function to refetch all vault data
+  const refetchVaultData = () => {
+    refetchBuffer()
+    refetchSync()
+    refetchStrategies()
+  }
+  
+  // Use buffer from contract or default
+  const liquidityBuffer = bufferFromContract ?? 25
+  
+  // Format last sync time
+  const { syncTimeDisplay, syncStatus } = useMemo(() => {
+    if (!lastSyncTimestamp) {
+      return { syncTimeDisplay: "No sync yet", syncStatus: "pending" as const }
+    }
+    
+    const now = Date.now()
+    const syncTime = Number(lastSyncTimestamp) * 1000 // Convert to milliseconds
+    const diffMs = now - syncTime
+    const diffHours = diffMs / (1000 * 60 * 60)
+    const diffDays = diffHours / 24
+    
+    let timeDisplay = ""
+    if (diffHours < 1) {
+      const diffMinutes = Math.floor(diffMs / (1000 * 60))
+      timeDisplay = `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`
+    } else if (diffHours < 24) {
+      timeDisplay = `${Math.floor(diffHours)} hour${Math.floor(diffHours) !== 1 ? 's' : ''} ago`
+    } else {
+      timeDisplay = `${Math.floor(diffDays)} day${Math.floor(diffDays) !== 1 ? 's' : ''} ago`
+    }
+    
+    const isOld = diffHours > 24
+    const status = isOld ? "warning" as const : "operational" as const
+    
+    return { syncTimeDisplay: timeDisplay, syncStatus: status }
+  }, [lastSyncTimestamp])
+  
+  // Determine active chains based on strategies
+  const activeChains = useMemo(() => {
+    if (!allowedStrategies || allowedStrategies.length === 0) {
+      return { chains: ["base"], count: 1 }
+    }
+    
+    // Simple logic: 2 strategies = Base + Solana, 1 strategy = Base only
+    const count = allowedStrategies.length
+    const chains = count === 2 ? ["base", "solana"] : ["base"]
+    
+    return { chains, count }
+  }, [allowedStrategies])
+  
   const [activeTab, setActiveTab] = useState("overview")
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [showRebalanceModal, setShowRebalanceModal] = useState(false)
   const [showAdjustBufferModal, setShowAdjustBufferModal] = useState(false)
   const [showAllocateModal, setShowAllocateModal] = useState(false)
-  const [liquidityBuffer, setLiquidityBuffer] = useState(25)
 
   // Mock data
   const allocationData = [
@@ -55,27 +119,10 @@ export default function DashboardPage() {
     { id: "liquidity-buffer", name: "Liquidity Buffer", currentPercentage: liquidityBuffer },
   ]
 
-  // Operation handlers
-  const handleSync = async () => {
-    // Simulate sync operation
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    console.log("Vault synced")
-    // In real app: refetch data here
-  }
 
   const handleRebalance = async (allocations: Record<string, number>) => {
-    // Simulate rebalance operation
-    await new Promise((resolve) => setTimeout(resolve, 2000))
     console.log("Rebalanced:", allocations)
-    // In real app: execute rebalance transaction
-  }
-
-  const handleAdjustBuffer = async (newBuffer: number) => {
-    // Simulate buffer adjustment
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setLiquidityBuffer(newBuffer)
-    console.log("Buffer adjusted to:", newBuffer)
-    // In real app: update contract state
+    // TODO: implement rebalance transaction
   }
 
   const handleAllocate = (baseAmount: number, solanaAmount: number) => {
@@ -131,18 +178,18 @@ export default function DashboardPage() {
                 <MetricCard
                   title="Total Value Locked"
                   value="$125,430"
-                  change="+12.5% this month"
-                  changeType="positive"
                   icon={DollarSign}
                 />
                 <MetricCard
                   title="Estimated APY"
                   value="9.8%"
-                  change="+0.3% from last week"
-                  changeType="positive"
                   icon={TrendingUp}
                 />
-                <MetricCard title="Active Chains" value="2" icon={Globe} />
+                <MetricCard 
+                  title="Active Chains" 
+                  value={isLoadingStrategies ? "..." : activeChains.count.toString()} 
+                  icon={Globe} 
+                />
               </div>
 
               {/* Main Content Grid */}
@@ -159,7 +206,9 @@ export default function DashboardPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Liquidity Buffer</span>
-                        <span className="font-medium text-foreground">{liquidityBuffer}%</span>
+                        <span className="font-medium text-foreground">
+                          {isLoadingBuffer ? "..." : `${liquidityBuffer}%`}
+                        </span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
                         <div className="h-full bg-accent rounded-full" style={{ width: `${liquidityBuffer}%` }} />
@@ -169,12 +218,28 @@ export default function DashboardPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Last Sync</span>
-                        <span className="font-medium text-foreground">2 hours ago</span>
+                        <span className="font-medium text-foreground">
+                          {isLoadingSync ? "..." : syncTimeDisplay}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-success">
-                        <Activity className="h-3 w-3" />
-                        <span>All systems operational</span>
-                      </div>
+                      {syncStatus === "operational" && (
+                        <div className="flex items-center gap-2 text-xs text-success">
+                          <Activity className="h-3 w-3" />
+                          <span>All systems operational</span>
+                        </div>
+                      )}
+                      {syncStatus === "warning" && (
+                        <div className="flex items-center gap-2 text-xs text-warning">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>Sync operation recommended</span>
+                        </div>
+                      )}
+                      {syncStatus === "pending" && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Activity className="h-3 w-3" />
+                          <span>Awaiting first sync</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-4 border-t border-border">
@@ -182,8 +247,13 @@ export default function DashboardPage() {
                         <span className="text-sm font-medium">Active Chains</span>
                       </div>
                       <div className="flex gap-2">
-                        <ChainBadge chain="base" />
-                        <ChainBadge chain="solana" />
+                        {isLoadingStrategies ? (
+                          <span className="text-xs text-muted-foreground">Loading...</span>
+                        ) : (
+                          activeChains.chains.map((chain) => (
+                            <ChainBadge key={chain} chain={chain as "base" | "solana"} />
+                          ))
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -266,7 +336,8 @@ export default function DashboardPage() {
       <SyncModal 
         open={showSyncModal} 
         onOpenChange={setShowSyncModal} 
-        onSync={handleSync}
+        vaultAddress={userVaultAddress as Address}
+        onSuccess={refetchVaultData}
       />
       <RebalanceModal 
         open={showRebalanceModal} 
@@ -278,7 +349,8 @@ export default function DashboardPage() {
         open={showAdjustBufferModal} 
         onOpenChange={setShowAdjustBufferModal}
         currentBuffer={liquidityBuffer}
-        onAdjustBuffer={handleAdjustBuffer}
+        vaultAddress={userVaultAddress as Address}
+        onSuccess={refetchVaultData}
       />
       <AllocateFundsModal 
         open={showAllocateModal} 

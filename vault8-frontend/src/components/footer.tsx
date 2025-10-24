@@ -59,8 +59,8 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Community</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Twitter
+                <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  X
                 </a>
               </li>
               <li>
