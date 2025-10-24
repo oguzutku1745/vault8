@@ -10,4 +10,5 @@ export * from "./useVaultData";
 export * from "./useERC20";
 export * from "./useERC4626";
 export * from "./useMyOApp";
+export * from "./useSolanaAdapter";
 

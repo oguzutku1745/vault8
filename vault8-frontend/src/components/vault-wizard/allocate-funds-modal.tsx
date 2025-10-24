@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Info, ArrowLeft, Loader2, CheckCircle2, ExternalLink, Clock, AlertCircle } from "lucide-react"
-import { useInitiateBridge, useAllocate, useQuoteLayerZeroFee } from "@/contracts/hooks"
+import { useInitiateBridge, useAllocate, useQuoteLayerZeroFee, usePendingBridge } from "@/contracts/hooks"
 import { useTotalAssets, useStrategyBalance } from "@/contracts/hooks"
 import { parseUnits, formatUnits } from "viem"
 import type { Address } from "viem"
@@ -50,6 +50,13 @@ export function AllocateFundsModal({
   const [expectedBridgeAmount, setExpectedBridgeAmount] = useState<bigint | null>(null)
 
   const hasSolana = chains.includes("solana")
+  
+  // Read pending bridge data from Solana adapter (after CCTP burn)
+  // This contains the actual minted amount (after Circle's CCTP fee)
+  const { pendingBridge } = usePendingBridge(
+    solanaStrategyAddress,
+    flowStep === "waiting_for_bot" || flowStep === "allocating"
+  )
   
   // Quote LayerZero fee for Solana allocation
   // Only enable when we've bridged and bot is complete (ready to allocate)
@@ -238,7 +245,17 @@ export function AllocateFundsModal({
       return
     }
 
-    const amount = parseUnits(solanaAmount, 6)
+    // CRITICAL: Use the actual pending bridge amount (after CCTP fees), not the user input
+    if (!pendingBridge || pendingBridge.amount === 0n) {
+      console.error("No pending bridge found. Please initiate bridge first.")
+      return
+    }
+
+    const amount = pendingBridge.amount
+    console.log("🔹 Allocating with pending bridge amount:", formatUnits(amount, 6), "USDC")
+    console.log("🔹 Expected amount (from user input):", solanaAmount, "USDC")
+    console.log("🔹 LayerZero fee:", formatUnits(layerZeroFee, 18), "ETH")
+    
     setFlowStep("allocating")
     // Pass LayerZero fee as msg.value for cross-chain message
     allocateSolana(amount, solanaStrategyAddress, layerZeroFee)
@@ -445,6 +462,14 @@ export function AllocateFundsModal({
                     {isBotComplete && (
                       <div className="space-y-3">
                         <div className="p-3 bg-muted rounded-lg space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Bridged Amount (after CCTP fee)</span>
+                            <span className="font-medium text-success">
+                              {pendingBridge && pendingBridge.amount > 0n
+                                ? `${formatUnits(pendingBridge.amount, 6)} USDC`
+                                : "Loading..."}
+                            </span>
+                          </div>
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">LayerZero Fee</span>
                             <span className="font-medium">
