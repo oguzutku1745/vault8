@@ -1,9 +1,13 @@
 const { ethers } = require("hardhat");
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+
 async function main() {
   const factoryAddress = process.env.FACTORY_ADDRESS;
   const compoundAdapter = process.env.COMPOUND_ADAPTER_ADDRESS;
   const solanaAdapter = process.env.SOLANA_ADAPTER_ADDRESS;
+  const delayMs = Number(process.env.SOLANA_TEST_DELAY_MS || "5000");
 
   if (!factoryAddress) throw new Error("FACTORY_ADDRESS env variable is required");
   if (!compoundAdapter) throw new Error("COMPOUND_ADAPTER_ADDRESS env variable is required");

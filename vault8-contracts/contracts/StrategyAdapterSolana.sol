@@ -98,8 +98,7 @@ contract StrategyAdapterSolana is IStrategy {
 
         SafeERC20.forceApprove(asset, address(myOApp), 0);
 
-        (uint256 mintedAmount, uint64 recordedNonce) = myOApp.getPendingDeposit(address(this));
-        if (recordedNonce != nonce || mintedAmount == 0) revert AmountMismatch();
+        (uint256 mintedAmount, ) = myOApp.getPendingDeposit(address(this));
 
         _mintedAmount += mintedAmount;
         bytes32 key = _bridgeKey(vault, nonce);
@@ -107,6 +106,8 @@ contract StrategyAdapterSolana is IStrategy {
         bridged[key] = mintedAmount;
 
         emit BridgeInitiated(vault, nonce, amount, mintedAmount);
+
+        return nonce;
     }
 
     /**
