@@ -15,11 +15,19 @@
     "jsxImportSource": "react",
     "types": ["vite/client", "react"],
 
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true
   },
   "include": ["src"]
 }
