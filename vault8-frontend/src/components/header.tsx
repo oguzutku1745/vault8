@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom"
 import { useAppKitAccount } from "@reown/appkit/react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useOwnerVault } from "@/contracts/hooks/useFactoryRead"
-import { ADMIN_ADDRESS } from "@/contracts/config"
+import { ADMIN_ADDRESS, CONTRACT_ADDRESSES } from "@/contracts/config"
 import type { Address } from "viem"
 
 export function Header() {
@@ -12,11 +12,28 @@ export function Header() {
   const isActive = (path: string) => location.pathname === path
   
   // Check if user owns any vaults (we only check for first vault at index 0)
-  const { vaultAddress: userVault } = useOwnerVault(address as Address | undefined, 0)
+  const { vaultAddress: userVault, isLoading: isLoadingVault, error: vaultError, refetch } = useOwnerVault(address as Address | undefined, 0)
+  
+  // Debug logging
+  console.log("🔍 Header - Ownership Check:", {
+    connectedAddress: address,
+    isConnected,
+    userVault,
+    isLoadingVault,
+    vaultError: vaultError?.message,
+    factoryAddress: CONTRACT_ADDRESSES.VAULT_FACTORY,
+  })
   
   // User can see dashboard if they own a vault OR they are the admin
   const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()
-  const canAccessDashboard = isAdmin || (userVault && userVault !== "0x0000000000000000000000000000000000000000")
+  const hasVault = userVault && userVault !== "0x0000000000000000000000000000000000000000"
+  const canAccessDashboard = isAdmin || hasVault
+  
+  console.log("🎯 Header - Access Control:", {
+    isAdmin,
+    hasVault,
+    canAccessDashboard,
+  })
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

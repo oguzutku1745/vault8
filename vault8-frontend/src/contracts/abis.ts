@@ -1,82 +1,110 @@
 /**
  * Contract ABIs for vault8 platform
- * Only includes the view functions we need for reading data
+ * Using exact format from compiled contract artifacts
  */
 
 export const VaultFactoryABI = [
-  // View functions
   {
-    type: 'function',
-    name: 'allVaults',
-    inputs: [{ name: '', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view'
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "allVaults",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
   },
   {
-    type: 'function',
-    name: 'getAllVaults',
     inputs: [],
-    outputs: [{ name: '', type: 'address[]' }],
-    stateMutability: 'view'
+    name: "allVaultsLength",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function"
   },
   {
-    type: 'function',
-    name: 'allVaultsLength',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'approvedStrategies',
-    inputs: [],
-    outputs: [{ name: '', type: 'address[]' }],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'isApprovedStrategy',
-    inputs: [{ name: '', type: 'address' }],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view'
-  },
-  
-  // Write functions
-  {
-    type: 'function',
-    name: 'approveStrategy',
-    inputs: [{ name: 'strategy', type: 'address' }],
+    inputs: [{ internalType: "address", name: "strategy", type: "address" }],
+    name: "approveStrategy",
     outputs: [],
-    stateMutability: 'nonpayable'
+    stateMutability: "nonpayable",
+    type: "function"
   },
   {
-    type: 'function',
-    name: 'deployVault',
+    inputs: [],
+    name: "approvedStrategies",
+    outputs: [{ internalType: "address[]", name: "", type: "address[]" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "approvedStrategiesList",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
     inputs: [
-      { name: 'asset', type: 'address' },
-      { name: 'name', type: 'string' },
-      { name: 'symbol', type: 'string' },
-      { name: 'vaultOwner', type: 'address' },
-      { name: 'selectedStrategies', type: 'address[]' }
+      { internalType: "contract IERC20", name: "asset", type: "address" },
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "string", name: "symbol", type: "string" },
+      { internalType: "address", name: "vaultOwner", type: "address" },
+      { internalType: "address[]", name: "selectedStrategies", type: "address[]" },
+      { internalType: "uint8", name: "initialLiquidityBuffer", type: "uint8" }
     ],
-    outputs: [{ name: 'vault', type: 'address' }],
-    stateMutability: 'nonpayable'
-  },
-  
-  // Events
-  {
-    type: 'event',
-    name: 'StrategyApproved',
-    inputs: [{ name: 'strategy', type: 'address', indexed: true }]
+    name: "deployVault",
+    outputs: [{ internalType: "contract ManagedVault", name: "vault", type: "address" }],
+    stateMutability: "nonpayable",
+    type: "function"
   },
   {
-    type: 'event',
-    name: 'VaultDeployed',
+    inputs: [],
+    name: "getAllVaults",
+    outputs: [{ internalType: "address[]", name: "", type: "address[]" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "address", name: "vault", type: "address" }],
+    name: "getVaultOwner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "address", name: "owner", type: "address" }],
+    name: "getVaultsByOwner",
+    outputs: [{ internalType: "address[]", name: "", type: "address[]" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "isApprovedStrategy",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    anonymous: false,
     inputs: [
-      { name: 'vault', type: 'address', indexed: true },
-      { name: 'asset', type: 'address', indexed: true },
-      { name: 'owner', type: 'address', indexed: true }
-    ]
+      { indexed: true, internalType: "address", name: "strategy", type: "address" }
+    ],
+    name: "StrategyApproved",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "vault", type: "address" },
+      { indexed: true, internalType: "address", name: "asset", type: "address" },
+      { indexed: true, internalType: "address", name: "owner", type: "address" }
+    ],
+    name: "VaultDeployed",
+    type: "event"
   }
 ] as const;
 
@@ -158,13 +186,6 @@ export const ManagedVaultABI = [
   },
   {
     type: 'function',
-    name: 'investedAssets',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
     name: 'owner',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
@@ -195,23 +216,6 @@ export const ManagedVaultABI = [
     ],
     outputs: [],
     stateMutability: 'payable'
-  },
-  {
-    type: 'function',
-    name: 'ownerVaults',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'index', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'vaultOwners',
-    inputs: [{ name: 'vault', type: 'address' }],
-    outputs: [{ name: '', type: 'address' }],
-    stateMutability: 'view'
   }
 ] as const;
 
@@ -221,4 +225,3 @@ export const IERC20ABI = [
   "function symbol() view returns (string)",
   "function name() view returns (string)",
 ] as const;
-

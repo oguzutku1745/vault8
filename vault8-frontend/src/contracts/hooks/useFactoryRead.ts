@@ -83,23 +83,71 @@ export function useVaultCount() {
 }
 
 /**
+ * Hook to get all vaults owned by a specific owner
+ * @param owner - The owner's address
+ */
+export function useOwnerVaults(owner: Address | undefined) {
+  const result = useReadContract({
+    address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
+    abi: VaultFactoryABI,
+    functionName: "getVaultsByOwner",
+    args: owner ? [owner] : undefined,
+    query: {
+      enabled: !!owner,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  // Debug logging - ALWAYS log
+  console.log("🔧 useOwnerVaults Hook:", {
+    owner,
+    factoryAddress: CONTRACT_ADDRESSES.VAULT_FACTORY,
+    functionName: "getVaultsByOwner",
+    args: owner ? [owner] : undefined,
+    enabled: !!owner,
+    data: result.data,
+    dataType: typeof result.data,
+    isArray: Array.isArray(result.data),
+    isLoading: result.isLoading,
+    isError: result.isError,
+    isSuccess: result.isSuccess,
+    error: result.error,
+    status: result.status,
+  });
+
+  return {
+    vaults: result.data as Address[] | undefined,
+    isLoading: result.isLoading,
+    error: result.error,
+    refetch: result.refetch,
+  };
+}
+
+/**
  * Hook to get a vault address owned by a specific owner at a given index
  * @param owner - The owner's address
  * @param index - The index in the owner's vault array (0 for first vault)
  */
 export function useOwnerVault(owner: Address | undefined, index: number = 0) {
-  const { data, isLoading, error, refetch } = useReadContract({
-    address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
-    abi: VaultFactoryABI,
-    functionName: "ownerVaults",
-    args: owner ? [owner, BigInt(index)] : undefined,
-    query: {
-      enabled: !!owner,
-    },
+  const { vaults, isLoading, error, refetch } = useOwnerVaults(owner);
+  
+  const vaultAddress = vaults && vaults.length > index ? vaults[index] : undefined;
+
+  // Debug logging - ALWAYS log
+  console.log("🔧 useOwnerVault Hook (from array):", {
+    owner,
+    index,
+    vaultsArray: vaults,
+    vaultsLength: vaults?.length,
+    vaultAtIndex: vaultAddress,
+    isLoading,
+    isError: !!error,
+    error: error?.message,
   });
 
   return {
-    vaultAddress: data as Address | undefined,
+    vaultAddress,
     isLoading,
     error,
     refetch,
@@ -114,7 +162,7 @@ export function useVaultOwnerAddress(vaultAddress: Address | undefined) {
   const { data, isLoading, error, refetch } = useReadContract({
     address: CONTRACT_ADDRESSES.VAULT_FACTORY as Address,
     abi: VaultFactoryABI,
-    functionName: "vaultOwners",
+    functionName: "getVaultOwner",
     args: vaultAddress ? [vaultAddress] : undefined,
     query: {
       enabled: !!vaultAddress,

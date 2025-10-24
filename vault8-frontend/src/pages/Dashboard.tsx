@@ -22,7 +22,16 @@ export default function DashboardPage() {
   const { address, isConnected } = useAppKitAccount()
   
   // Get the user's vault (first vault at index 0)
-  const { vaultAddress: userVaultAddress, isLoading: isLoadingVault } = useOwnerVault(address as `0x${string}` | undefined, 0)
+  const { vaultAddress: userVaultAddress, isLoading: isLoadingVault, error: vaultError, refetch } = useOwnerVault(address as `0x${string}` | undefined, 0)
+  
+  // Debug logging
+  console.log("📊 Dashboard - Vault Check:", {
+    connectedAddress: address,
+    isConnected,
+    userVaultAddress,
+    isLoadingVault,
+    vaultError: vaultError?.message,
+  })
   
   // Check if user is admin
   const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()
@@ -86,7 +95,7 @@ export default function DashboardPage() {
             {isConnected && userVaultAddress && userVaultAddress !== "0x0000000000000000000000000000000000000000" && (
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Your Vault:</span>
-                <AddressDisplay address={userVaultAddress} showCopy showExplorer chainId={84532} />
+                <p className="font-mono text-sm text-foreground">{userVaultAddress}</p>
               </div>
             )}
           </div>
@@ -239,47 +248,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Recent Activity */}
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      {
-                        action: "Rebalanced",
-                        description: "Optimized allocation across strategies",
-                        time: "2 hours ago",
-                        chain: "base" as const,
-                      },
-                      {
-                        action: "Deposit",
-                        description: "Added 5,000 USDC to vault",
-                        time: "1 day ago",
-                        chain: "solana" as const,
-                      },
-                      {
-                        action: "Yield Claimed",
-                        description: "Harvested 125 USDC in rewards",
-                        time: "2 days ago",
-                        chain: "base" as const,
-                      },
-                    ].map((activity, index) => (
-                      <div key={index} className="flex items-start gap-4 pb-4 border-b border-border last:border-0">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-foreground">{activity.action}</p>
-                            <ChainBadge chain={activity.chain} size="sm" />
-                          </div>
-                          <p className="text-sm text-muted-foreground">{activity.description}</p>
-                        </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+
             </TabsContent>
 
             {isAdmin && (

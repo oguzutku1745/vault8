@@ -39,8 +39,8 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
   const [steps, setSteps] = useState<DeploymentStep[]>([
     { id: 1, title: "Deploy Strategy Adapters", description: "Creating new strategy adapter contracts...", status: "pending" },
     { id: 2, title: "Approve Strategies", description: "Registering adapters with VaultFactory...", status: "pending" },
-    { id: 3, title: "Deploy Vault", description: "Creating your managed vault...", status: "pending" },
-    { id: 4, title: "Final Configuration", description: "Binding adapters to vault and setting buffer...", status: "pending" },
+    { id: 3, title: "Deploy Vault", description: "Creating your managed vault with initial liquidity buffer...", status: "pending" },
+    { id: 4, title: "Final Configuration", description: "Binding adapters to vault...", status: "pending" },
   ])
 
   const [currentStepId, setCurrentStepId] = useState(0) // 0 = not started
@@ -67,8 +67,8 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
     setHasStartedVaultDeploy(false)
     setHasStartedConfig(false)
     setConfigIndex(0)
-    setIsConfiguringBuffer(false)
     setLastProcessedConfigTx(null)
+    setDeploymentComplete(false)
     setSteps(prev => prev.map(step => ({ ...step, status: "pending", txHash: undefined, deployedAddresses: undefined, error: undefined })))
   }
 
@@ -323,6 +323,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
           vaultConfig.vaultSymbol,
           vaultConfig.vaultOwner as Address,
           deployedAdapterAddresses,
+          vaultConfig.liquidityBuffer,
         ],
       })
     }
@@ -398,8 +399,8 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
 
   const [configIndex, setConfigIndex] = useState(0)
   const [hasStartedConfig, setHasStartedConfig] = useState(false)
-  const [isConfiguringBuffer, setIsConfiguringBuffer] = useState(false)
   const [lastProcessedConfigTx, setLastProcessedConfigTx] = useState<string | null>(null)
+  const [deploymentComplete, setDeploymentComplete] = useState(false)
 
   // Start configuration when entering step 4
   useEffect(() => {
@@ -434,29 +435,13 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
 
   // Handle successful configurations
   useEffect(() => {
-    if (currentStepId !== 4 || !configReceiptSuccess || !configReceipt || !configHash) return
+    if (currentStepId !== 4 || !configReceiptSuccess || !configReceipt || !configHash || deploymentComplete) return
     
     // Prevent processing the same transaction twice
     if (lastProcessedConfigTx === configHash) return
     setLastProcessedConfigTx(configHash)
 
     const nextIndex = configIndex + 1
-    
-    // If we're currently setting the buffer, don't do anything else
-    if (isConfiguringBuffer) {
-      // Buffer configuration complete
-      updateStep(4, { 
-        status: "success", 
-        description: "Configuration complete!",
-        txHash: configHash,
-      })
-      setHasStartedConfig(false)
-      setIsConfiguringBuffer(false)
-      if (deployedVaultAddress) {
-        onComplete(deployedVaultAddress)
-      }
-      return
-    }
     
     if (nextIndex < deployedAdapterAddresses.length) {
       // Configure next adapter
@@ -471,19 +456,17 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         args: [deployedVaultAddress!],
       })
     } else {
-      // All adapters configured, now set liquidity buffer
-      setIsConfiguringBuffer(true)
-      setConfigIndex(nextIndex)
-      updateStep(4, { description: "Setting liquidity buffer..." })
-      
-      configureContract({
-        address: deployedVaultAddress!,
-        abi: ManagedVaultABI,
-        functionName: "setLiquidityBuffer",
-        args: [vaultConfig.liquidityBuffer],
+      // All adapters configured - deployment complete!
+      setDeploymentComplete(true)
+      setHasStartedConfig(false)
+      updateStep(4, { 
+        status: "success", 
+        description: "All configurations complete! Your vault has been deployed successfully.",
+        txHash: configHash,
       })
+      console.log("✅ Vault Deployment Complete! Address:", deployedVaultAddress)
     }
-  }, [configReceiptSuccess, configReceipt, configHash, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig, configureContract, lastProcessedConfigTx, isConfiguringBuffer, onComplete])
+  }, [configReceiptSuccess, configReceipt, configHash, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig, configureContract, lastProcessedConfigTx, deploymentComplete])
 
   // This effect is now handled inline in the previous effect
 
@@ -565,9 +548,39 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
           ))}
         </div>
 
+        {/* Success Message with Vault Address */}
+        {deploymentComplete && deployedVaultAddress && (
+          <div className="p-4 border border-success bg-success/10 rounded-lg space-y-3">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-6 w-6 text-success shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <h4 className="font-semibold text-foreground">Vault Deployed Successfully! 🎉</h4>
+                <p className="text-sm text-muted-foreground">Your managed vault has been deployed and configured.</p>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-foreground">Vault Address:</p>
+                  <div className="flex items-center gap-2 text-sm font-mono bg-background px-3 py-2 rounded border border-border">
+                    <span className="text-foreground flex-1 break-all">{deployedVaultAddress}</span>
+                    <button onClick={() => navigator.clipboard.writeText(deployedVaultAddress)} className="text-primary hover:text-primary/80">
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <a 
+                      href={`https://sepolia.basescan.org/address/${deployedVaultAddress}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={currentStepId > 0 && currentStepId < 4}>
-            {currentStepId === 4 ? "Close" : "Cancel"}
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={currentStepId > 0 && !deploymentComplete}>
+            {deploymentComplete ? "Close" : "Cancel"}
           </Button>
           
           {currentStepId === 0 && (
@@ -590,8 +603,13 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
             </Button>
           )}
 
-          {currentStepId === 4 && steps[3].status === "success" && (
-            <Button onClick={() => onOpenChange(false)}>
+          {deploymentComplete && (
+            <Button onClick={() => {
+              onOpenChange(false)
+              if (deployedVaultAddress) {
+                onComplete(deployedVaultAddress)
+              }
+            }}>
               Done
             </Button>
           )}
