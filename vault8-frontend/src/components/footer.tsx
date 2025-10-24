@@ -27,7 +27,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#docs" className="hover:text-foreground transition-colors">
+                <a href="https://github.com/oguzutku1745/vault8" className="hover:text-foreground transition-colors">
                   Documentation
                 </a>
               </li>
@@ -69,7 +69,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                <a href="https://github.com/oguzutku1745/vault8" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                   GitHub
                 </a>
               </li>
