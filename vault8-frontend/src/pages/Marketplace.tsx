@@ -1,136 +1,82 @@
-import { useState } from "react"
+import React, { useState, useMemo } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { VaultCard } from "@/components/vault-card"
-import { Search, SlidersHorizontal } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Search, SlidersHorizontal, Loader2 } from "lucide-react"
 import type { Vault } from "@/lib/types"
+import { useAllVaults } from "@/contracts/hooks/useFactoryRead"
+import { useVaultData } from "@/contracts/hooks/useVaultData"
+import type { Address } from "viem"
+import { formatUnits } from "viem"
+
+/**
+ * Component to fetch and display a single vault's data
+ */
+function VaultItem({ vaultAddress, searchQuery, filterChain }: { 
+  vaultAddress: Address;
+  searchQuery: string;
+  filterChain: string;
+}) {
+  const vaultData = useVaultData(vaultAddress)
+  
+  // Don't render while loading or if no data
+  if (!vaultData || vaultData.isLoading) {
+    return null
+  }
+  
+  // Transform to Vault type
+  const vault: Vault = {
+    id: vaultAddress,
+    name: vaultData.name,
+    chains: vaultData.chains,
+    totalValue: Number(formatUnits(vaultData.totalAssets, 6)),
+    apy: 0, // Not available on-chain
+    userHoldings: 0, // Will implement later
+    strategies: vaultData.strategies.map((s: { name: string; allocation: number; balance: bigint }) => ({
+      name: s.name,
+      protocol: s.name === "Compound V3" ? "Compound" : "Jupiter",
+      allocation: s.allocation,
+      apy: 0, // Not available on-chain
+      chain: s.name === "Compound V3" ? "base" as const : "solana" as const,
+      status: "active" as const,
+    })),
+    liquidityBuffer: 0, // Will calculate if needed
+    lastSync: new Date(),
+    status: "active" as const,
+  }
+  
+  // Apply filters
+  const matchesSearch = vault.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const matchesChain =
+    filterChain === "all" ||
+    (filterChain === "base" && vault.chains.includes("base")) ||
+    (filterChain === "solana" && vault.chains.includes("solana")) ||
+    (filterChain === "cross-chain" && vault.chains.length > 1)
+  
+  if (!matchesSearch || !matchesChain) {
+    return null
+  }
+  
+  return <VaultCard vault={vault} />
+}
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("apy")
-  const [filterChain, setFilterChain] = useState("all")
-
-  // Mock vault data
-  const vaults: Vault[] = [
-    {
-      id: "vault-1",
-      name: "Stable Yield Optimizer",
-      chains: ["base", "solana"],
-      totalValue: 2450000,
-      apy: 12.5,
-      apyChange: 1.2,
-      userHoldings: 5000,
-      strategies: [
-        { name: "Compound V3", protocol: "Compound", allocation: 45, apy: 8.5, chain: "base", status: "active" },
-        { name: "Jupiter", protocol: "Jupiter", allocation: 35, apy: 12.3, chain: "solana", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 20, apy: 0, chain: "base", status: "active" },
-      ],
-      liquidityBuffer: 20,
-      lastSync: new Date(),
-      status: "active",
-    },
-    {
-      id: "vault-2",
-      name: "Base DeFi Maximizer",
-      chains: ["base"],
-      totalValue: 1850000,
-      apy: 9.8,
-      apyChange: 0.5,
-      userHoldings: 12500,
-      strategies: [
-        { name: "Compound V3", protocol: "Compound", allocation: 60, apy: 8.5, chain: "base", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 40, apy: 0, chain: "base", status: "active" },
-      ],
-      liquidityBuffer: 40,
-      lastSync: new Date(),
-      status: "active",
-    },
-    {
-      id: "vault-3",
-      name: "Solana High Yield",
-      chains: ["solana"],
-      totalValue: 3200000,
-      apy: 15.2,
-      apyChange: 2.1,
-      strategies: [
-        { name: "Jupiter", protocol: "Jupiter", allocation: 70, apy: 12.3, chain: "solana", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 30, apy: 0, chain: "solana", status: "active" },
-      ],
-      liquidityBuffer: 30,
-      lastSync: new Date(),
-      status: "active",
-    },
-    {
-      id: "vault-4",
-      name: "Conservative Growth",
-      chains: ["base"],
-      totalValue: 980000,
-      apy: 7.5,
-      apyChange: -0.3,
-      userHoldings: 2500,
-      strategies: [
-        { name: "Compound V3", protocol: "Compound", allocation: 50, apy: 8.5, chain: "base", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 50, apy: 0, chain: "base", status: "active" },
-      ],
-      liquidityBuffer: 50,
-      lastSync: new Date(),
-      status: "active",
-    },
-    {
-      id: "vault-5",
-      name: "Cross-Chain Alpha",
-      chains: ["base", "solana"],
-      totalValue: 5600000,
-      apy: 13.8,
-      apyChange: 1.8,
-      strategies: [
-        { name: "Compound V3", protocol: "Compound", allocation: 40, apy: 8.5, chain: "base", status: "active" },
-        { name: "Jupiter", protocol: "Jupiter", allocation: 45, apy: 12.3, chain: "solana", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 15, apy: 0, chain: "base", status: "active" },
-      ],
-      liquidityBuffer: 15,
-      lastSync: new Date(),
-      status: "active",
-    },
-    {
-      id: "vault-6",
-      name: "Balanced Portfolio",
-      chains: ["base", "solana"],
-      totalValue: 1450000,
-      apy: 10.5,
-      apyChange: 0.8,
-      userHoldings: 8000,
-      strategies: [
-        { name: "Compound V3", protocol: "Compound", allocation: 50, apy: 8.5, chain: "base", status: "active" },
-        { name: "Jupiter", protocol: "Jupiter", allocation: 25, apy: 12.3, chain: "solana", status: "active" },
-        { name: "Buffer", protocol: "Liquidity", allocation: 25, apy: 0, chain: "base", status: "active" },
-      ],
-      liquidityBuffer: 25,
-      lastSync: new Date(),
-      status: "active",
-    },
-  ]
-
-  // Filter and sort vaults
-  const filteredVaults = vaults
-    .filter((vault) => {
-      const matchesSearch = vault.name.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesChain =
-        filterChain === "all" ||
-        (filterChain === "base" && vault.chains.includes("base")) ||
-        (filterChain === "solana" && vault.chains.includes("solana")) ||
-        (filterChain === "cross-chain" && vault.chains.length > 1)
-      return matchesSearch && matchesChain
-    })
-    .sort((a, b) => {
-      if (sortBy === "apy") return b.apy - a.apy
-      if (sortBy === "tvl") return b.totalValue - a.totalValue
-      if (sortBy === "holdings") return (b.userHoldings || 0) - (a.userHoldings || 0)
-      return 0
-    })
+  const [sortBy, setSortBy] = useState("tvl")
+  const [filterChain, setFilterChain] = useState("cross-chain")
+  
+  // Fetch all vault addresses
+  const { vaults: vaultAddresses, isLoading: isLoadingVaults } = useAllVaults()
+  
+  // Fetch data for each vault and apply filters
+  const vaultsWithData = useMemo(() => {
+    if (!vaultAddresses || vaultAddresses.length === 0) return []
+    return vaultAddresses
+  }, [vaultAddresses])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -151,7 +97,7 @@ export default function MarketplacePage() {
               <Input
                 placeholder="Search vaults..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -183,25 +129,40 @@ export default function MarketplacePage() {
 
           {/* Results Count */}
           <div className="mb-6">
-            <p className="text-sm text-muted-foreground">
-              Showing {filteredVaults.length} {filteredVaults.length === 1 ? "vault" : "vaults"}
-            </p>
+            {isLoadingVaults ? (
+              <p className="text-sm text-muted-foreground">Loading vaults...</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Showing {vaultsWithData.length} {vaultsWithData.length === 1 ? "vault" : "vaults"}
+              </p>
+            )}
           </div>
 
           {/* Vault Grid */}
-          {filteredVaults.length > 0 ? (
+          {isLoadingVaults ? (
+            <Card className="border-border bg-card">
+              <CardContent className="flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Loading vaults from blockchain...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : vaultsWithData.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredVaults.map((vault) => (
-                <VaultCard key={vault.id} vault={vault} />
+              {vaultsWithData.map((vaultAddress) => (
+                <VaultItem 
+                  key={vaultAddress} 
+                  vaultAddress={vaultAddress}
+                  searchQuery={searchQuery}
+                  filterChain={filterChain}
+                />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-lg font-semibold text-foreground mb-2">No vaults found</p>
-              <p className="text-muted-foreground">Try adjusting your search or filters</p>
-              <Button variant="outline" className="mt-4 bg-transparent" onClick={() => setSearchQuery("")}>
-                Clear Search
-              </Button>
+              <p className="text-lg font-semibold text-foreground mb-2">No vaults deployed</p>
+              <p className="text-muted-foreground">No vaults have been deployed yet</p>
             </div>
           )}
         </div>

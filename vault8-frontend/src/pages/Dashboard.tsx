@@ -16,9 +16,11 @@ import { AllocateFundsModal } from "@/components/vault-wizard/allocate-funds-mod
 import { AddressDisplay } from "@/components/address-display"
 import { TrendingUp, Layers, Globe, RefreshCw, Settings, DollarSign, Activity, Wallet, AlertTriangle } from "lucide-react"
 import { useOwnerVault } from "@/contracts/hooks/useFactoryRead"
-import { useLiquidityBuffer, useLastSyncTimestamp, useAllowedStrategies } from "@/contracts/hooks/useVaultRead"
-import { ADMIN_ADDRESS } from "@/contracts/config"
+import { useLiquidityBuffer, useLastSyncTimestamp, useAllowedStrategies, useTotalAssets, useStrategyBalance } from "@/contracts/hooks/useVaultRead"
+import { ADMIN_ADDRESS, TARGET_PROTOCOLS } from "@/contracts/config"
 import type { Address } from "viem"
+import { useReadContract } from "wagmi"
+import { formatUnits } from "viem"
 
 export default function DashboardPage() {
   const { address, isConnected } = useAppKitAccount()
@@ -48,13 +50,14 @@ export default function DashboardPage() {
   const { allowedStrategies, isLoading: isLoadingStrategies, refetch: refetchStrategies } = useAllowedStrategies(
     userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address
   )
+  const { totalAssets: totalAssetsRaw, isLoading: isLoadingTotalAssets, refetch: refetchTotalAssets } = useTotalAssets(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address
+  )
   
-  // Function to refetch all vault data
-  const refetchVaultData = () => {
-    refetchBuffer()
-    refetchSync()
-    refetchStrategies()
-  }
+  // Format total assets (USDC has 6 decimals)
+  const totalAssetsFormatted = totalAssetsRaw 
+    ? `$${Number(formatUnits(totalAssetsRaw, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : "$0.00"
   
   // Use buffer from contract or default
   const liquidityBuffer = bufferFromContract ?? 25
@@ -100,19 +103,174 @@ export default function DashboardPage() {
     return { chains, count }
   }, [allowedStrategies])
   
+  // Identify strategy adapter types and fetch balances
+  // Compound adapter has: comet() -> returns IComet address
+  // Solana adapter has: myOApp() -> returns IMyOAppBridge address
+  
+  const compoundAdapterABI = [
+    {
+      "inputs": [],
+      "name": "comet",
+      "outputs": [{"internalType": "contract IComet", "name": "", "type": "address"}],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ] as const
+  
+  const solanaAdapterABI = [
+    {
+      "inputs": [],
+      "name": "myOApp",
+      "outputs": [{"internalType": "contract IMyOAppBridge", "name": "", "type": "address"}],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ] as const
+  
+  // Get strategy addresses
+  const strategy0Address = allowedStrategies?.[0]
+  const strategy1Address = allowedStrategies?.[1]
+  
+  // Try to identify first strategy
+  const { data: myOAppTest0 } = useReadContract({
+    address: strategy0Address,
+    abi: solanaAdapterABI,
+    functionName: "myOApp",
+    query: {
+      enabled: !!strategy0Address,
+    },
+  })
+  
+  const { data: cometTest0 } = useReadContract({
+    address: strategy0Address,
+    abi: compoundAdapterABI,
+    functionName: "comet",
+    query: {
+      enabled: !!strategy0Address,
+    },
+  })
+  
+  // Try to identify second strategy
+  const { data: myOAppTest1 } = useReadContract({
+    address: strategy1Address,
+    abi: solanaAdapterABI,
+    functionName: "myOApp",
+    query: {
+      enabled: !!strategy1Address,
+    },
+  })
+  
+  const { data: cometTest1 } = useReadContract({
+    address: strategy1Address,
+    abi: compoundAdapterABI,
+    functionName: "comet",
+    query: {
+      enabled: !!strategy1Address,
+    },
+  })
+  
+  // Determine which strategy is which
+  const strategy0IsCompound = cometTest0 && cometTest0.toLowerCase() === TARGET_PROTOCOLS.COMPOUND_V3_COMET.toLowerCase()
+  const strategy0IsSolana = myOAppTest0 && myOAppTest0.toLowerCase() === TARGET_PROTOCOLS.MYOAPP_BRIDGE.toLowerCase()
+  const strategy1IsCompound = cometTest1 && cometTest1.toLowerCase() === TARGET_PROTOCOLS.COMPOUND_V3_COMET.toLowerCase()
+  const strategy1IsSolana = myOAppTest1 && myOAppTest1.toLowerCase() === TARGET_PROTOCOLS.MYOAPP_BRIDGE.toLowerCase()
+  
+  const compoundStrategyAddress = strategy0IsCompound ? strategy0Address : strategy1IsCompound ? strategy1Address : undefined
+  const solanaStrategyAddress = strategy0IsSolana ? strategy0Address : strategy1IsSolana ? strategy1Address : undefined
+  
+  // Fetch strategy balances
+  const { balance: compoundBalance, isLoading: isLoadingCompoundBalance, refetch: refetchCompoundBalance } = useStrategyBalance(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
+    compoundStrategyAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
+    !!compoundStrategyAddress
+  )
+  
+  const { balance: solanaBalance, isLoading: isLoadingSolanaBalance, refetch: refetchSolanaBalance } = useStrategyBalance(
+    userVaultAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
+    solanaStrategyAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
+    !!solanaStrategyAddress
+  )
+  
+  // Log detection results
+  console.log("🔍 Strategy Adapter Type Detection:")
+  console.log("Strategy 0 Address:", strategy0Address)
+  console.log("  - myOApp() call result:", myOAppTest0)
+  console.log("  - comet() call result:", cometTest0)
+  if (strategy0IsSolana) {
+    console.log("  ✅ Strategy 0 is SOLANA adapter (myOApp matches)")
+  }
+  if (strategy0IsCompound) {
+    console.log("  ✅ Strategy 0 is COMPOUND adapter (comet matches)")
+  }
+  
+  console.log("\nStrategy 1 Address:", strategy1Address)
+  console.log("  - myOApp() call result:", myOAppTest1)
+  console.log("  - comet() call result:", cometTest1)
+  if (strategy1IsSolana) {
+    console.log("  ✅ Strategy 1 is SOLANA adapter (myOApp matches)")
+  }
+  if (strategy1IsCompound) {
+    console.log("  ✅ Strategy 1 is COMPOUND adapter (comet matches)")
+  }
+  
+  console.log("\n📊 Strategy Balances:")
+  console.log("Compound Balance:", compoundBalance ? formatUnits(compoundBalance, 6) : "0")
+  console.log("Solana Balance:", solanaBalance ? formatUnits(solanaBalance, 6) : "0")
+  console.log("Total Assets:", totalAssetsRaw ? formatUnits(totalAssetsRaw, 6) : "0")
+  
+  // Calculate dynamic allocation data
+  const allocationData = useMemo(() => {
+    if (!totalAssetsRaw || totalAssetsRaw === 0n) {
+      return []
+    }
+    
+    const totalAssetsNum = Number(formatUnits(totalAssetsRaw, 6))
+    const compoundBalanceNum = compoundBalance ? Number(formatUnits(compoundBalance, 6)) : 0
+    const solanaBalanceNum = solanaBalance ? Number(formatUnits(solanaBalance, 6)) : 0
+    const cashBalance = totalAssetsNum - compoundBalanceNum - solanaBalanceNum
+    
+    // Calculate percentages
+    const compoundPercent = (compoundBalanceNum / totalAssetsNum) * 100
+    const solanaPercent = (solanaBalanceNum / totalAssetsNum) * 100
+    const cashPercent = (cashBalance / totalAssetsNum) * 100
+    
+    console.log("\n💰 Allocation Breakdown:")
+    console.log(`Compound V3: $${compoundBalanceNum.toFixed(2)} (${compoundPercent.toFixed(2)}%)`)
+    console.log(`Jupiter: $${solanaBalanceNum.toFixed(2)} (${solanaPercent.toFixed(2)}%)`)
+    console.log(`Cash (Liquidity Buffer): $${cashBalance.toFixed(2)} (${cashPercent.toFixed(2)}%)`)
+    
+    const data = []
+    
+    if (compoundPercent > 0) {
+      data.push({ name: "Compound V3", value: Number(compoundPercent.toFixed(2)), color: "#0052FF" })
+    }
+    if (solanaPercent > 0) {
+      data.push({ name: "Jupiter", value: Number(solanaPercent.toFixed(2)), color: "#9945FF" })
+    }
+    if (cashPercent > 0) {
+      data.push({ name: "Liquidity Buffer", value: Number(cashPercent.toFixed(2)), color: "#14F195" })
+    }
+    
+    return data
+  }, [totalAssetsRaw, compoundBalance, solanaBalance])
+  
+  // Function to refetch all vault data
+  const refetchVaultData = () => {
+    refetchBuffer()
+    refetchSync()
+    refetchStrategies()
+    refetchTotalAssets()
+    if (compoundStrategyAddress) refetchCompoundBalance()
+    if (solanaStrategyAddress) refetchSolanaBalance()
+  }
+  
   const [activeTab, setActiveTab] = useState("overview")
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [showRebalanceModal, setShowRebalanceModal] = useState(false)
   const [showAdjustBufferModal, setShowAdjustBufferModal] = useState(false)
   const [showAllocateModal, setShowAllocateModal] = useState(false)
 
-  // Mock data
-  const allocationData = [
-    { name: "Compound V3", value: 40, color: "#0052FF" },
-    { name: "Jupiter", value: 35, color: "#9945FF" },
-    { name: "Liquidity Buffer", value: liquidityBuffer, color: "#14F195" },
-  ]
-
+  // Mock data for rebalance modal
   const strategies = [
     { id: "compound-v3", name: "Compound V3", currentPercentage: 40 },
     { id: "jupiter", name: "Jupiter", currentPercentage: 35 },
@@ -177,7 +335,7 @@ export default function DashboardPage() {
               <div className="grid gap-6 md:grid-cols-3">
                 <MetricCard
                   title="Total Value Locked"
-                  value="$125,430"
+                  value={isLoadingTotalAssets ? "..." : totalAssetsFormatted}
                   icon={DollarSign}
                 />
                 <MetricCard
@@ -195,7 +353,21 @@ export default function DashboardPage() {
               {/* Main Content Grid */}
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Allocation Chart */}
-                <AllocationChart data={allocationData} />
+                {allocationData.length === 0 ? (
+                  <Card className="border-border bg-card">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">Strategy Allocation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center h-[300px]">
+                      <div className="text-center space-y-2">
+                        <p className="text-muted-foreground">No balance data found</p>
+                        <p className="text-xs text-muted-foreground">Deposit funds to see allocation breakdown</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <AllocationChart data={allocationData} />
+                )}
 
                 {/* Vault Health */}
                 <Card className="border-border bg-card">

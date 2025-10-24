@@ -19,7 +19,6 @@ export interface Vault {
   chains: ChainType[]
   totalValue: number
   apy: number
-  apyChange: number
   userHoldings?: number
   strategies: Strategy[]
   liquidityBuffer: number

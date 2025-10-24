@@ -27,15 +27,6 @@ export function VaultCard({ vault }: VaultCardProps) {
 
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold text-accent">{vault.apy}%</span>
-          <div
-            className={cn("flex items-center gap-1 text-sm", {
-              "text-success": apyTrend === "positive",
-              "text-destructive": apyTrend === "negative",
-            })}
-          >
-            {apyTrend === "positive" ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-            <span>{Math.abs(vault.apyChange)}%</span>
-          </div>
         </div>
         <p className="text-xs text-muted-foreground">Est. APY</p>
       </CardHeader>
