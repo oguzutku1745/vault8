@@ -528,6 +528,7 @@ export default function DashboardPage() {
         open={showAllocateModal} 
         onOpenChange={setShowAllocateModal}
         onAllocate={handleAllocate}
+        chains={activeChains.chains as ("base" | "solana")[]}
       />
     </div>
   )

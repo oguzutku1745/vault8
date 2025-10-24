@@ -5,6 +5,7 @@ import { StepIndicator } from "@/components/step-indicator"
 import { ChainSelectionStep } from "./chain-selection-step"
 import { StrategySelectionStep } from "./strategy-selection-step"
 import { BufferOwnerStep } from "./liquidity-buffer-step"
+import { NameSymbolStep } from "./name-symbol-step"
 import { ReviewStep } from "./review-step"
 import { DeploymentFlowModal } from "./deployment-flow-modal"
 import { ArrowLeft, ArrowRight, Rocket } from "lucide-react"
@@ -13,6 +14,7 @@ const steps = [
   { label: "Chains", description: "Select networks" },
   { label: "Strategies", description: "Choose protocols" },
   { label: "Buffer & Owner", description: "Set liquidity & owner" },
+  { label: "Name & Symbol", description: "Define vault identity" },
   { label: "Review", description: "Confirm & deploy" },
 ]
 
@@ -22,6 +24,8 @@ export function VaultCreationWizard() {
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([])
   const [liquidityBuffer, setLiquidityBuffer] = useState(15)
   const [vaultOwner, setVaultOwner] = useState("")
+  const [vaultName, setVaultName] = useState("")
+  const [vaultSymbol, setVaultSymbol] = useState("")
   const [showDeploymentModal, setShowDeploymentModal] = useState(false)
 
   const handleChainToggle = (chain: "base" | "solana") => {
@@ -49,6 +53,7 @@ export function VaultCreationWizard() {
     if (currentStep === 1) return selectedChains.length > 0
     if (currentStep === 2) return selectedStrategies.length > 0
     if (currentStep === 3) return vaultOwner.length > 0 && vaultOwner.startsWith("0x")
+    if (currentStep === 4) return vaultName.length > 0 && vaultSymbol.length > 0
     return true
   }
 
@@ -78,6 +83,14 @@ export function VaultCreationWizard() {
               />
             )}
             {currentStep === 4 && (
+              <NameSymbolStep
+                vaultName={vaultName}
+                vaultSymbol={vaultSymbol}
+                onNameChange={setVaultName}
+                onSymbolChange={setVaultSymbol}
+              />
+            )}
+            {currentStep === 5 && (
               <ReviewStep
                 selectedChains={selectedChains}
                 selectedStrategies={selectedStrategies}
@@ -97,7 +110,7 @@ export function VaultCreationWizard() {
             Back
           </Button>
 
-          {currentStep < 4 ? (
+          {currentStep < 5 ? (
             <Button onClick={() => setCurrentStep((prev) => prev + 1)} disabled={!canProceed()}>
               Next
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -122,8 +135,8 @@ export function VaultCreationWizard() {
           selectedStrategies,
           liquidityBuffer,
           vaultOwner,
-          vaultName: "My Vault", // TODO: Add vault name/symbol input
-          vaultSymbol: "MV",
+          vaultName,
+          vaultSymbol,
         }}
         onComplete={handleDeploymentComplete}
       />

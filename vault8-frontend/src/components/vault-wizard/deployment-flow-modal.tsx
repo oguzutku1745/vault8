@@ -69,6 +69,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
     setConfigIndex(0)
     setLastProcessedConfigTx(null)
     setDeploymentComplete(false)
+    setIsProcessingConfig(false)
     setSteps(prev => prev.map(step => ({ ...step, status: "pending", txHash: undefined, deployedAddresses: undefined, error: undefined })))
   }
 
@@ -401,11 +402,13 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
   const [hasStartedConfig, setHasStartedConfig] = useState(false)
   const [lastProcessedConfigTx, setLastProcessedConfigTx] = useState<string | null>(null)
   const [deploymentComplete, setDeploymentComplete] = useState(false)
+  const [isProcessingConfig, setIsProcessingConfig] = useState(false)
 
   // Start configuration when entering step 4
   useEffect(() => {
-    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && !hasStartedConfig) {
+    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && !hasStartedConfig && !isProcessingConfig) {
       setHasStartedConfig(true)
+      setIsProcessingConfig(true)
       setConfigIndex(0)
       updateStep(4, { status: "in_progress", description: `Configuring adapter 1 of ${deployedAdapterAddresses.length}...` })
       
@@ -418,7 +421,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         args: [deployedVaultAddress],
       })
     }
-  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, hasStartedConfig, vaultConfig, configureContract])
+  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, hasStartedConfig, isProcessingConfig, vaultConfig, configureContract])
 
   // Handle configuration errors
   useEffect(() => {
@@ -430,12 +433,13 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         txHash: configHash,
       })
       setHasStartedConfig(false)
+      setIsProcessingConfig(false)
     }
   }, [configReceiptError, configHash, currentStepId])
 
   // Handle successful configurations
   useEffect(() => {
-    if (currentStepId !== 4 || !configReceiptSuccess || !configReceipt || !configHash || deploymentComplete) return
+    if (currentStepId !== 4 || !configReceiptSuccess || !configReceipt || !configHash || deploymentComplete || !isProcessingConfig) return
     
     // Prevent processing the same transaction twice
     if (lastProcessedConfigTx === configHash) return
@@ -459,6 +463,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
       // All adapters configured - deployment complete!
       setDeploymentComplete(true)
       setHasStartedConfig(false)
+      setIsProcessingConfig(false)
       updateStep(4, { 
         status: "success", 
         description: "All configurations complete! Your vault has been deployed successfully.",
@@ -466,7 +471,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
       })
       console.log("✅ Vault Deployment Complete! Address:", deployedVaultAddress)
     }
-  }, [configReceiptSuccess, configReceipt, configHash, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig, configureContract, lastProcessedConfigTx, deploymentComplete])
+  }, [configReceiptSuccess, configReceipt, configHash, configIndex, deployedAdapterAddresses, deployedVaultAddress, vaultConfig, configureContract, lastProcessedConfigTx, deploymentComplete, isProcessingConfig])
 
   // This effect is now handled inline in the previous effect
 
