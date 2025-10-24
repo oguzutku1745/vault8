@@ -283,11 +283,6 @@ export default function DashboardPage() {
     // TODO: implement rebalance transaction
   }
 
-  const handleAllocate = (baseAmount: number, solanaAmount: number) => {
-    console.log("Allocating:", { baseAmount, solanaAmount })
-    // In real app: execute deposit transactions
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -527,8 +522,10 @@ export default function DashboardPage() {
       <AllocateFundsModal 
         open={showAllocateModal} 
         onOpenChange={setShowAllocateModal}
-        onAllocate={handleAllocate}
         chains={activeChains.chains as ("base" | "solana")[]}
+        vaultAddress={userVaultAddress as Address}
+        compoundStrategyAddress={compoundStrategyAddress as Address}
+        solanaStrategyAddress={solanaStrategyAddress as Address | undefined}
       />
     </div>
   )

@@ -73,62 +73,10 @@ export default function VaultDetailPage() {
   const { deposit, isPending: isDepositing, isConfirming: isDepositConfirming, isSuccess: isDepositSuccess, hash: depositHash } = useVaultDeposit(vaultAddress)
   const { withdraw, isPending: isWithdrawing, isConfirming: isWithdrawConfirming, isSuccess: isWithdrawSuccess, hash: withdrawHash } = useVaultWithdraw(vaultAddress)
 
-  // Format balances
-  const usdcBalanceFormatted = usdcBalance ? Number(formatUnits(usdcBalance, 6)).toFixed(2) : "0.00"
-  const vaultSharesFormatted = vaultShares ? Number(formatUnits(vaultShares, 6)).toFixed(2) : "0.00"
-  const maxWithdrawableFormatted = maxWithdrawable ? Number(formatUnits(maxWithdrawable, 6)).toFixed(2) : "0.00"
-
-  // Refetch balances after successful transactions
-  useEffect(() => {
-    if (isDepositSuccess) {
-      refetchUSDC()
-      refetchShares()
-      refetchMaxWithdraw()
-      setDepositAmount("")
-    }
-  }, [isDepositSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
-
-  useEffect(() => {
-    if (isWithdrawSuccess) {
-      refetchUSDC()
-      refetchShares()
-      refetchMaxWithdraw()
-      setWithdrawAmount("")
-    }
-  }, [isWithdrawSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
-
-  useEffect(() => {
-    if (isApproveSuccess) {
-      refetchAllowance()
-    }
-  }, [isApproveSuccess, refetchAllowance])
-
-  // Check if approval is needed
-  const needsApproval = depositAmount && allowance !== undefined && parseFloat(depositAmount) > 0 && allowance < BigInt(Math.floor(parseFloat(depositAmount) * 1e6))
-
-  // Handle deposit
-  const handleDeposit = () => {
-    if (!isConnected || !userAddress || !depositAmount) return
-
-    if (needsApproval) {
-      // Approve first
-      approve(vaultAddress, depositAmount, 6)
-    } else {
-      // Deposit
-      deposit(depositAmount, userAddress as Address, 6)
-    }
-  }
-
-  // Handle withdraw
-  const handleWithdraw = () => {
-    if (!isConnected || !userAddress || !withdrawAmount) return
-    withdraw(withdrawAmount, userAddress as Address, userAddress as Address, 6)
-  }
-
   // Fetch vault data
   const { name, isLoading: isLoadingName } = useVaultName(vaultAddress)
-  const { totalAssets: totalAssetsRaw, isLoading: isLoadingAssets } = useTotalAssets(vaultAddress)
-  const { allowedStrategies, isLoading: isLoadingStrategies } = useAllowedStrategies(vaultAddress)
+  const { totalAssets: totalAssetsRaw, isLoading: isLoadingAssets, refetch: refetchTotalAssets } = useTotalAssets(vaultAddress)
+  const { allowedStrategies, isLoading: isLoadingStrategies, refetch: refetchStrategies } = useAllowedStrategies(vaultAddress)
 
   // Get strategy addresses
   const strategy0Address = allowedStrategies?.[0]
@@ -173,17 +121,79 @@ export default function VaultDetailPage() {
   const solanaStrategyAddress = strategy0IsSolana ? strategy0Address : strategy1IsSolana ? strategy1Address : undefined
 
   // Fetch strategy balances
-  const { balance: compoundBalance } = useStrategyBalance(
+  const { balance: compoundBalance, refetch: refetchCompoundBalance } = useStrategyBalance(
     vaultAddress,
     compoundStrategyAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
     !!compoundStrategyAddress
   )
 
-  const { balance: solanaBalance } = useStrategyBalance(
+  const { balance: solanaBalance, refetch: refetchSolanaBalance } = useStrategyBalance(
     vaultAddress,
     solanaStrategyAddress as Address || "0x0000000000000000000000000000000000000000" as Address,
     !!solanaStrategyAddress
   )
+
+  // Function to refetch all vault data
+  const refetchVaultData = () => {
+    refetchTotalAssets()
+    refetchStrategies()
+    if (compoundStrategyAddress) refetchCompoundBalance()
+    if (solanaStrategyAddress) refetchSolanaBalance()
+  }
+
+  // Format balances
+  const usdcBalanceFormatted = usdcBalance ? Number(formatUnits(usdcBalance, 6)).toFixed(2) : "0.00"
+  const vaultSharesFormatted = vaultShares ? Number(formatUnits(vaultShares, 6)).toFixed(2) : "0.00"
+  const maxWithdrawableFormatted = maxWithdrawable ? Number(formatUnits(maxWithdrawable, 6)).toFixed(2) : "0.00"
+
+  // Refetch balances after successful transactions
+  useEffect(() => {
+    if (isDepositSuccess) {
+      refetchUSDC()
+      refetchShares()
+      refetchMaxWithdraw()
+      refetchVaultData()
+      setDepositAmount("")
+    }
+  }, [isDepositSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
+
+  useEffect(() => {
+    if (isWithdrawSuccess) {
+      refetchUSDC()
+      refetchShares()
+      refetchMaxWithdraw()
+      refetchVaultData()
+      setWithdrawAmount("")
+    }
+  }, [isWithdrawSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
+
+  useEffect(() => {
+    if (isApproveSuccess) {
+      refetchAllowance()
+    }
+  }, [isApproveSuccess, refetchAllowance])
+
+  // Check if approval is needed
+  const needsApproval = depositAmount && allowance !== undefined && parseFloat(depositAmount) > 0 && allowance < BigInt(Math.floor(parseFloat(depositAmount) * 1e6))
+
+  // Handle deposit
+  const handleDeposit = () => {
+    if (!isConnected || !userAddress || !depositAmount) return
+
+    if (needsApproval) {
+      // Approve first
+      approve(vaultAddress, depositAmount, 6)
+    } else {
+      // Deposit
+      deposit(depositAmount, userAddress as Address, 6)
+    }
+  }
+
+  // Handle withdraw
+  const handleWithdraw = () => {
+    if (!isConnected || !userAddress || !withdrawAmount) return
+    withdraw(withdrawAmount, userAddress as Address, userAddress as Address, 6)
+  }
 
   // Format total assets
   const totalAssetsFormatted = totalAssetsRaw 

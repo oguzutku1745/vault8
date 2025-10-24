@@ -406,7 +406,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
 
   // Start configuration when entering step 4
   useEffect(() => {
-    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && !hasStartedConfig && !isProcessingConfig) {
+    if (currentStepId === 4 && deployedVaultAddress && deployedAdapterAddresses.length > 0 && !hasStartedConfig && !isProcessingConfig && !deploymentComplete) {
       setHasStartedConfig(true)
       setIsProcessingConfig(true)
       setConfigIndex(0)
@@ -421,11 +421,11 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
         args: [deployedVaultAddress],
       })
     }
-  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, hasStartedConfig, isProcessingConfig, vaultConfig, configureContract])
+  }, [currentStepId, deployedVaultAddress, deployedAdapterAddresses, hasStartedConfig, isProcessingConfig, deploymentComplete, vaultConfig, configureContract])
 
   // Handle configuration errors
   useEffect(() => {
-    if (currentStepId !== 4) return
+    if (currentStepId !== 4 || deploymentComplete) return
     if (configReceiptError && configHash) {
       updateStep(4, { 
         status: "error", 
@@ -435,7 +435,7 @@ export function DeploymentFlowModal({ open, onOpenChange, vaultConfig, onComplet
       setHasStartedConfig(false)
       setIsProcessingConfig(false)
     }
-  }, [configReceiptError, configHash, currentStepId])
+  }, [configReceiptError, configHash, currentStepId, deploymentComplete])
 
   // Handle successful configurations
   useEffect(() => {

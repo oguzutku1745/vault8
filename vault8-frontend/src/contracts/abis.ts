@@ -216,6 +216,26 @@ export const ManagedVaultABI = [
     ],
     outputs: [],
     stateMutability: 'payable'
+  },
+  {
+    type: 'function',
+    name: 'recall',
+    inputs: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'strategy', type: 'address' }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'initiateBridge',
+    inputs: [
+      { name: 'strategy', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: 'nonce', type: 'uint64' }],
+    stateMutability: 'nonpayable'
   }
 ] as const;
 

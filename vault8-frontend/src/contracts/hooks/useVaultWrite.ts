@@ -133,3 +133,33 @@ export function useRecall(vaultAddress: Address) {
   };
 }
 
+/**
+ * Hook for initiating a bridge to Solana via CCTP
+ * Calls initiateBridge(address strategy, uint256 amount) which returns a nonce
+ * The bot will pick up the CctpDepositInitiated event and submit attestation to Solana
+ */
+export function useInitiateBridge(vaultAddress: Address) {
+  const { writeContract, data: hash, isPending, isSuccess, error } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const initiateBridge = (amount: bigint, strategyAddress: Address) => {
+    writeContract({
+      address: vaultAddress,
+      abi: ManagedVaultABI,
+      functionName: "initiateBridge",
+      args: [strategyAddress, amount],
+    });
+  };
+
+  return {
+    initiateBridge,
+    hash,
+    isPending,
+    isConfirming,
+    isSuccess: isConfirmed,
+    error,
+  };
+}
