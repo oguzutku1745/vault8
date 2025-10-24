@@ -63,7 +63,7 @@ export function Header() {
                 isActive('/marketplace') ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Marketplace
+              Markets
             </Link>
             <a
               href="https://github.com/oguzutku1745/vault8"

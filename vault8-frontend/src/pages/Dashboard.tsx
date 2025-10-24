@@ -248,7 +248,7 @@ export default function DashboardPage() {
       data.push({ name: "Jupiter", value: Number(solanaPercent.toFixed(2)), color: "#9945FF" })
     }
     if (cashPercent > 0) {
-      data.push({ name: "Liquidity Buffer", value: Number(cashPercent.toFixed(2)), color: "#14F195" })
+      data.push({ name: "Cash", value: Number(cashPercent.toFixed(2)), color: "#14F195" })
     }
     
     return data
@@ -274,7 +274,7 @@ export default function DashboardPage() {
   const strategies = [
     { id: "compound-v3", name: "Compound V3", currentPercentage: 40 },
     { id: "jupiter", name: "Jupiter", currentPercentage: 35 },
-    { id: "liquidity-buffer", name: "Liquidity Buffer", currentPercentage: liquidityBuffer },
+    { id: "liquidity-buffer", name: "Cash Buffer", currentPercentage: liquidityBuffer },
   ]
 
 

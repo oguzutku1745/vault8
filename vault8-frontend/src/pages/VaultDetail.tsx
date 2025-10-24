@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { useParams } from "react-router-dom"
 import { useReadContract } from "wagmi"
+import { useAppKitAccount } from "@reown/appkit/react"
 import { formatUnits } from "viem"
 import type { Address } from "viem"
 import { Header } from "@/components/header"
@@ -16,6 +17,8 @@ import { ChainBadge } from "@/components/chain-badge"
 import { AddressDisplay } from "@/components/address-display"
 import { TrendingUp, DollarSign, ArrowDownToLine, ArrowUpFromLine, Loader2 } from "lucide-react"
 import { useTotalAssets, useAllowedStrategies, useStrategyBalance, useVaultName } from "@/contracts/hooks/useVaultRead"
+import { useERC20Balance, useERC20Allowance, useERC20Approve } from "@/contracts/hooks/useERC20"
+import { useVaultDeposit, useVaultWithdraw, useVaultShareBalance, useMaxWithdraw } from "@/contracts/hooks/useERC4626"
 import { TARGET_PROTOCOLS } from "@/contracts/config"
 
 const compoundAdapterABI = [
@@ -45,12 +48,82 @@ const SOLANA_STORE_ACCOUNT = "MHso38U1uo8br3gSU6bXKC8apXorKzfwPqMVgYaKCma"
 
 export default function VaultDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { address: userAddress, isConnected } = useAppKitAccount()
   const [depositAmount, setDepositAmount] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState("")
   const [activeTab, setActiveTab] = useState("deposit")
 
   // Get vault address from URL
   const vaultAddress = (id || "0x0000000000000000000000000000000000000000") as Address
+
+  // User balances
+  const { balance: usdcBalance, refetch: refetchUSDC } = useERC20Balance(BASE_USDC as Address, userAddress as Address)
+  const { shares: vaultShares, refetch: refetchShares } = useVaultShareBalance(vaultAddress, userAddress as Address)
+  const { maxWithdrawable, refetch: refetchMaxWithdraw } = useMaxWithdraw(vaultAddress, userAddress as Address)
+
+  // Approval
+  const { allowance, refetch: refetchAllowance } = useERC20Allowance(
+    BASE_USDC as Address,
+    userAddress as Address,
+    vaultAddress
+  )
+  const { approve, isPending: isApproving, isConfirming: isApprovingConfirming, isSuccess: isApproveSuccess } = useERC20Approve(BASE_USDC as Address)
+
+  // Deposit & Withdraw
+  const { deposit, isPending: isDepositing, isConfirming: isDepositConfirming, isSuccess: isDepositSuccess, hash: depositHash } = useVaultDeposit(vaultAddress)
+  const { withdraw, isPending: isWithdrawing, isConfirming: isWithdrawConfirming, isSuccess: isWithdrawSuccess, hash: withdrawHash } = useVaultWithdraw(vaultAddress)
+
+  // Format balances
+  const usdcBalanceFormatted = usdcBalance ? Number(formatUnits(usdcBalance, 6)).toFixed(2) : "0.00"
+  const vaultSharesFormatted = vaultShares ? Number(formatUnits(vaultShares, 6)).toFixed(2) : "0.00"
+  const maxWithdrawableFormatted = maxWithdrawable ? Number(formatUnits(maxWithdrawable, 6)).toFixed(2) : "0.00"
+
+  // Refetch balances after successful transactions
+  useEffect(() => {
+    if (isDepositSuccess) {
+      refetchUSDC()
+      refetchShares()
+      refetchMaxWithdraw()
+      setDepositAmount("")
+    }
+  }, [isDepositSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
+
+  useEffect(() => {
+    if (isWithdrawSuccess) {
+      refetchUSDC()
+      refetchShares()
+      refetchMaxWithdraw()
+      setWithdrawAmount("")
+    }
+  }, [isWithdrawSuccess, refetchUSDC, refetchShares, refetchMaxWithdraw])
+
+  useEffect(() => {
+    if (isApproveSuccess) {
+      refetchAllowance()
+    }
+  }, [isApproveSuccess, refetchAllowance])
+
+  // Check if approval is needed
+  const needsApproval = depositAmount && allowance !== undefined && parseFloat(depositAmount) > 0 && allowance < BigInt(Math.floor(parseFloat(depositAmount) * 1e6))
+
+  // Handle deposit
+  const handleDeposit = () => {
+    if (!isConnected || !userAddress || !depositAmount) return
+
+    if (needsApproval) {
+      // Approve first
+      approve(vaultAddress, depositAmount, 6)
+    } else {
+      // Deposit
+      deposit(depositAmount, userAddress as Address, 6)
+    }
+  }
+
+  // Handle withdraw
+  const handleWithdraw = () => {
+    if (!isConnected || !userAddress || !withdrawAmount) return
+    withdraw(withdrawAmount, userAddress as Address, userAddress as Address, 6)
+  }
 
   // Fetch vault data
   const { name, isLoading: isLoadingName } = useVaultName(vaultAddress)
@@ -148,7 +221,7 @@ export default function VaultDetailPage() {
       data.push({ name: "Jupiter", value: Number(solanaPercent.toFixed(2)), color: "#9945FF" })
     }
     if (cashPercent > 0) {
-      data.push({ name: "Liquidity Buffer", value: Number(cashPercent.toFixed(2)), color: "#14F195" })
+      data.push({ name: "Cash", value: Number(cashPercent.toFixed(2)), color: "#14F195" })
     }
 
     return data
@@ -280,21 +353,66 @@ export default function VaultDetailPage() {
 
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Available Balance</span>
-                        <span className="font-medium">10,000 USDC</span>
+                        <span className="font-medium">{usdcBalanceFormatted} USDC</span>
                       </div>
 
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setDepositAmount("10000")}
+                        onClick={() => setDepositAmount(usdcBalanceFormatted)}
                         className="w-full bg-transparent"
+                        disabled={!isConnected || !usdcBalance || usdcBalance === 0n}
                       >
                         Use Max
                       </Button>
 
-                      <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                        <ArrowDownToLine className="mr-2 h-4 w-4" />
-                        Deposit
+                      {isDepositSuccess && depositHash && (
+                        <div className="p-2 rounded bg-success/10 border border-success">
+                          <p className="text-xs text-success text-center">
+                            Deposit successful!{" "}
+                            <a
+                              href={`https://sepolia.basescan.org/tx/${depositHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                            >
+                              View TX
+                            </a>
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={handleDeposit}
+                        disabled={
+                          !isConnected ||
+                          !depositAmount ||
+                          parseFloat(depositAmount) <= 0 ||
+                          isApproving ||
+                          isApprovingConfirming ||
+                          isDepositing ||
+                          isDepositConfirming
+                        }
+                      >
+                        {isApproving || isApprovingConfirming ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Approving...
+                          </>
+                        ) : isDepositing || isDepositConfirming ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Depositing...
+                          </>
+                        ) : needsApproval ? (
+                          <>Approve USDC</>
+                        ) : (
+                          <>
+                            <ArrowDownToLine className="mr-2 h-4 w-4" />
+                            Deposit
+                          </>
+                        )}
                       </Button>
                     </TabsContent>
 
@@ -313,22 +431,57 @@ export default function VaultDetailPage() {
 
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Your Holdings</span>
-                        <span className="font-medium">0 USDC</span>
+                        <span className="font-medium">{maxWithdrawableFormatted} USDC</span>
                       </div>
 
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setWithdrawAmount("0")}
+                        onClick={() => setWithdrawAmount(maxWithdrawableFormatted)}
                         className="w-full bg-transparent"
-                        disabled
+                        disabled={!isConnected || !maxWithdrawable || maxWithdrawable === 0n}
                       >
                         Withdraw All
                       </Button>
 
-                      <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                        <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                        Withdraw
+                      {isWithdrawSuccess && withdrawHash && (
+                        <div className="p-2 rounded bg-success/10 border border-success">
+                          <p className="text-xs text-success text-center">
+                            Withdraw successful!{" "}
+                            <a
+                              href={`https://sepolia.basescan.org/tx/${withdrawHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                            >
+                              View TX
+                            </a>
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={handleWithdraw}
+                        disabled={
+                          !isConnected ||
+                          !withdrawAmount ||
+                          parseFloat(withdrawAmount) <= 0 ||
+                          isWithdrawing ||
+                          isWithdrawConfirming
+                        }
+                      >
+                        {isWithdrawing || isWithdrawConfirming ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Withdrawing...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                            Withdraw
+                          </>
+                        )}
                       </Button>
                     </TabsContent>
                   </Tabs>
@@ -337,7 +490,7 @@ export default function VaultDetailPage() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Your Holdings</span>
-                        <span className="font-semibold text-foreground">$0.00</span>
+                        <span className="font-semibold text-foreground">${maxWithdrawableFormatted}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Est. Annual Yield</span>
