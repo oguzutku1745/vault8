@@ -1,13 +1,13 @@
 # Vault8 - Cross-Chain DeFi Vault Platform
 
-Vault8 is a cross-chain DeFi vault management system that enables users to deploy and manage vaults with strategies spanning multiple blockchains. The platform leverages Circle's CCTP (Cross-Chain Transfer Protocol) and LayerZero for secure cross-chain USDC transfers and messaging.
+Vault8 is a cross-chain DeFi vault management system that enables users to deploy and manage vaults with strategies spanning multiple blockchains. The platform leverages Circle's CCTP (Cross-Chain Transfer Protocol) and LayerZero for secure cross-chain native USDC transfers and messaging.
 
 ## Overview
 
 Vault8 allows users to:
 - **Deploy ERC-4626 compliant vaults** on Base with customizable strategies
-- **Allocate funds to DeFi protocols** on Base (Compound V3) and Solana (Jupiter)
-- **Bridge assets seamlessly** between Base and Solana using CCTP + LayerZero
+- **Allocate funds to DeFi protocols** on any chain with Layer Zero and Native USDC support. (Only Base and Solana for demo)
+- **Bridge assets seamlessly** Between Base and Solana using CCTP + LayerZero
 - **Monitor and manage allocations** through an intuitive web interface
 
 ## Tech Stack
@@ -37,7 +37,9 @@ Vault8 allows users to:
 
 ### DeFi Integrations
 - **Compound V3** - Lending protocol on Base
-- **Jupiter** (planned) - DEX aggregator on Solana
+- **Jupiter** - DEX aggregator on Solana
+
+Why those 2? Cause we were able to find native USDC support for only those 2 platforms on testnet.
 
 ## Project Structure
 
