@@ -35,7 +35,7 @@ Using CCTP alone would require manual attestation fetching. Adding LayerZero ena
 │     ├─> CCTP message created with nonce                             │
 │     └─> Event: CctpDepositInitiated(nonce, user, grossAmount)       │
 │                                                                     │
-│  3. Strategy calls MyOApp.requestDeposit (after bot attestation)    │
+│  3. Adapter calls MyOApp.requestDeposit (after bot attestation)     │
 │     ├─> Encodes LayerZero message                                   │
 │     ├─> Sends to Solana via LayerZero Endpoint                      │
 │     └─> Event: LzSent(guid, evm_address, amount)                    │
