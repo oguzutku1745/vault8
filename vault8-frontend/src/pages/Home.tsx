@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Shield, Zap, TrendingUp, ArrowRight } from "lucide-react"
+import { Shield, Zap, TrendingUp, ArrowRight, Globe } from "lucide-react"
 import { Link } from "react-router-dom"
 
 export default function HomePage() {
@@ -28,8 +28,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-8 text-lg text-muted-foreground text-balance">
-                vault8 automatically optimizes your crypto assets across multiple chains and protocols, delivering
-                superior returns with institutional-grade security.
+              vault8 is a cross-chain DeFi vault management system that enables users to deploy and manage vaults with strategies spanning multiple blockchains.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -37,9 +36,6 @@ export default function HomePage() {
                   <Link to="/marketplace">
                     Explore Vaults <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link to="/dashboard">Create Vault</Link>
                 </Button>
               </div>
             </div>
@@ -52,21 +48,11 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="flex flex-col items-center text-center p-6 rounded-xl border border-border bg-card hover:border-primary/50 transition-colors">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Shield className="h-6 w-6 text-primary" />
+                  <Globe className="h-6 w-6 text-secondary" />
                 </div>
-                <h3 className="mb-2 text-xl font-bold">Secure & Audited</h3>
+                <h3 className="mb-2 text-xl font-bold">Wide Range of Integration</h3>
                 <p className="text-muted-foreground">
-                  Smart contracts audited by leading security firms with multi-sig protection
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center text-center p-6 rounded-xl border border-border bg-card hover:border-secondary/50 transition-colors">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
-                  <Zap className="h-6 w-6 text-secondary" />
-                </div>
-                <h3 className="mb-2 text-xl font-bold">Auto-Rebalancing</h3>
-                <p className="text-muted-foreground">
-                  Intelligent algorithms continuously optimize your portfolio for maximum yield
+                  Reach to wide range of DeFi protocols and chains with ease by native USDC support.
                 </p>
               </div>
 
@@ -79,6 +65,17 @@ export default function HomePage() {
                   Outperform traditional DeFi strategies with cross-chain optimization
                 </p>
               </div>
+
+              <div className="flex flex-col items-center text-center p-6 rounded-xl border border-border bg-card hover:border-secondary/50 transition-colors">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+                  <Shield className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="mb-2 text-xl font-bold">Decentralized Infra</h3>
+                <p className="text-muted-foreground">
+                  All the security is handled by the infrastructure of LayerZero and Circle. Back up infrastructure is available in case of any issues.
+                </p>
+              </div>
+
             </div>
           </div>
         </section>

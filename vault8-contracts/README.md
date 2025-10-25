@@ -112,7 +112,6 @@ Generic adapter for any ERC-4626 vault.
 ### Supporting Contracts
 
 - **`IStrategy.sol`** - Interface all adapters must implement
-- **`SimpleVault.sol`** - Basic ERC-4626 implementation for reference
 - **Mock Contracts** - Testing utilities (`MockComet`, `MockStrategy`, etc.)
 
 ## Tech Stack

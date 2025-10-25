@@ -40,10 +40,8 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-secondary">
-              <span className="text-lg font-bold text-white">V8</span>
-            </div>
-            <span className="text-xl font-bold">vault8</span>
+            <img src="/path60.png" alt="Vault8 Logo" className="h-8 w-8 rounded-lg" />
+            
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
