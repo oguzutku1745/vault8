@@ -1,3 +1,7 @@
+Cross-chain protocol transaction hashes:
+https://sepolia.basescan.org/tx/0xf5047d078f72d21b525a6ae48c74eb6f07b661af86c05340b3a82873510de9fc - BaseSepolia
+https://testnet.layerzeroscan.com/tx/0xf5047d078f72d21b525a6ae48c74eb6f07b661af86c05340b3a82873510de9fc - LayerZero TestNet
+
 # Vault8 - Cross-Chain DeFi Vault Platform
 
 Vault8 is a cross-chain DeFi vault management system that enables users to deploy and manage vaults with strategies spanning multiple blockchains. The platform leverages Circle's CCTP (Cross-Chain Transfer Protocol) and LayerZero for secure cross-chain native USDC transfers and messaging.
