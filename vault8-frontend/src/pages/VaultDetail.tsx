@@ -251,7 +251,7 @@ export default function VaultDetailPage() {
         name: "Compound V3",
         protocol: "Compound",
         allocation: Number(allocation.toFixed(2)),
-        apy: 0,
+        apy: 3.4,
         chain: "base" as const,
       })
     }
@@ -263,7 +263,7 @@ export default function VaultDetailPage() {
         name: "Jupiter",
         protocol: "Jupiter",
         allocation: Number(allocation.toFixed(2)),
-        apy: 0,
+        apy: 8.67,
         chain: "solana" as const,
       })
     }
@@ -285,6 +285,15 @@ export default function VaultDetailPage() {
 
     return result
   }, [totalAssetsRaw, compoundBalance, solanaBalance])
+
+  // Calculate estimated APY based on active chains
+  const estimatedAPY = useMemo(() => {
+    if (chains.length === 2) {
+      return "8.67%" // Both Base and Solana active (Jupiter APY)
+    } else {
+      return "3.4%" // Only Base active (Compound APY)
+    }
+  }, [chains])
 
   const isLoading = isLoadingName || isLoadingAssets || isLoadingStrategies
 
@@ -327,7 +336,7 @@ export default function VaultDetailPage() {
           <div className="grid gap-6 md:grid-cols-2 mb-8">
             <MetricCard
               title="Estimated APY"
-              value="0%"
+              value={estimatedAPY}
               icon={TrendingUp}
             />
             <MetricCard title="Total Deposits" value={totalAssetsFormatted} icon={DollarSign} />

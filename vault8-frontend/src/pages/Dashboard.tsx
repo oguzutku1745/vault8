@@ -254,6 +254,15 @@ export default function DashboardPage() {
     return data
   }, [totalAssetsRaw, compoundBalance, solanaBalance])
   
+  // Calculate estimated APY based on active chains
+  const estimatedAPY = useMemo(() => {
+    if (activeChains.chains.length === 2) {
+      return "8.67%" // Both Base and Solana active (Jupiter APY)
+    } else {
+      return "3.4%" // Only Base active (Compound APY)
+    }
+  }, [activeChains.chains])
+
   // Function to refetch all vault data
   const refetchVaultData = () => {
     refetchBuffer()
@@ -335,7 +344,7 @@ export default function DashboardPage() {
                 />
                 <MetricCard
                   title="Estimated APY"
-                  value="9.8%"
+                  value={estimatedAPY}
                   icon={TrendingUp}
                 />
                 <MetricCard 
