@@ -1,331 +1,731 @@
-<p align="center">
-  <a href="https://layerzero.network">
-    <img alt="LayerZero" style="width: 400px" src="https://docs.layerzero.network/img/LayerZero_Logo_White.svg"/>
-  </a>
-</p>
+# Vault8 Cross-Chain Infrastructure
 
-<p align="center">
-  <a href="https://layerzero.network" style="color: #a77dff">Homepage</a> | <a href="https://docs.layerzero.network/" style="color: #a77dff">Docs</a> | <a href="https://layerzero.network/developers" style="color: #a77dff">Developers</a>
-</p>
+Cross-chain messaging and asset bridging infrastructure for Vault8, enabling USDC transfers from Base to Solana using Circle's CCTP (Cross-Chain Transfer Protocol) combined with LayerZero V2 messaging. This repository contains the LayerZero OApp implementations, CCTP attestation bot, and deployment tooling.
 
-<h1 align="center">OApp Example</h1>
+## Overview
 
-<p align="center">
-  <a href="https://docs.layerzero.network/v2/concepts/getting-started/what-is-layerzero" style="color: #a77dff">Core Concepts</a> | <a href="https://docs.layerzero.network/v2/developers/evm/configuration/options" style="color: #a77dff">Message Execution Options</a> | <a href="https://docs.layerzero.network/v2/deployments/deployed-contracts" style="color: #a77dff">Endpoint Addresses</a>
-</p>
+The Vault8 cross-chain infrastructure consists of three main components:
 
-<p align="center">Template project for getting started with LayerZero's  <code>OApp</code> development for Solana <> EVM.</p>
+1. **MyOApp (EVM)** - Solidity contract on Base Sepolia implementing LayerZero V2 OApp
+2. **my_oapp (Solana)** - Anchor program on Solana Devnet implementing LayerZero V2 OApp
+3. **CCTP Attestation Bot** - Automated service that fetches Circle attestations and submits them to Solana
 
-<br>
-This is a simple cross-chain string-passing OApp example involving EVM and Solana.
+### Why Two Protocols?
 
-## How a Solana OApp works
+- **Circle CCTP** - Native USDC transfer (burn & mint) between chains with minimal fees
+- **LayerZero V2** - Cross-chain messaging for notifying Solana program about deposits
 
-For a more thorough walkthrough of how a Solana OApp works, refer to [Solana OApp Reference](https://docs.layerzero.network/v2/developers/solana/oapp/overview) in our docs. The reference details the accounts that are required, which will help you identify modifications needed to support your specific use case.
+Using CCTP alone would require manual attestation fetching. Adding LayerZero enables automated, trustless notifications.
 
-## Requirements
+## Architecture
 
-- Rust `v1.75.0`
-- Anchor `v0.29`
-- Solana CLI `v1.17.31`
-- Docker
-- Node.js
+### Complete Flow: Base → Solana
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Base Sepolia (EVM)                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. Adapter calls MyOApp.depositViaCCTP(1000000 USDC)               │
+│     ├─> USDC transferred to MyOApp                                  │
+│     └─> MyOApp approves TokenMessenger                              │
+│                                                                     │
+│  2. MyOApp.depositViaCCTP calls CCTP TokenMessenger                 │
+│     ├─> USDC burned on Base                                         │
+│     ├─> CCTP message created with nonce                             │
+│     └─> Event: CctpDepositInitiated(nonce, user, grossAmount)       │
+│                                                                     │
+│  3. Strategy calls MyOApp.requestDeposit (after bot attestation)    │
+│     ├─> Encodes LayerZero message                                   │
+│     ├─> Sends to Solana via LayerZero Endpoint                      │
+│     └─> Event: LzSent(guid, evm_address, amount)                    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ [Circle Attestation API]
+                                 │ [LayerZero DVN + Executor]
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      CCTP Attestation Bot                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. Listens for CctpDepositInitiated events on Base                 │
+│  2. Fetches attestation from Circle Iris API                        │
+│  3. Submits to Solana MessageTransmitter (receiveMessage)           │
+│  4. USDC minted to Store's USDC ATA on Solana                       │
+│  5. Tracks processed nonces to avoid duplicates                     │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Solana Devnet (Anchor)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. LayerZero calls my_oapp::lz_receive                             │
+│     ├─> Decodes message (guid, evm_address, amount)                 │
+│     ├─> Updates UserBalance PDA (tracking deposits)                 │
+│     ├─> CPI to Jupiter Lend: deposit USDC                           │
+│     ├─> Store receives fTokens (yield-bearing receipt)              │
+│     └─> Emits DepositEvent for indexing                             │
+│                                                                     │
+│  Jupiter Lend automatically compounds yield on the deposited USDC   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Components
+
+### 1. MyOApp (EVM) - Base Sepolia
+
+Solidity contract extending LayerZero's `OApp` standard with CCTP integration.
+
+**Location:** `contracts/MyOApp.sol`
+
+**Key Features:**
+- CCTP V2 integration (Fast Transfer with 1000 finality threshold)
+- Two-step deposit flow (CCTP burn + LayerZero message)
+- Pending deposit tracking (keyed by user address)
+- Compose message handling for acknowledgments
+
+**Main Functions:**
+
+```solidity
+// Step 1: Burn USDC via CCTP and record deposit
+function depositViaCCTP(uint256 amount) external returns (uint64 nonce)
+
+// Step 2: Send LayerZero message to Solana (after bot attestation)
+function requestDeposit(uint32 dstEid, bytes calldata _options) 
+    external payable returns (MessagingReceipt memory)
+
+// Query pending deposit for a user
+function getPendingDeposit(address user) 
+    external view returns (uint256 amount, uint64 nonce)
+
+// Quote LayerZero messaging fee
+function quote(uint32 dstEid, bytes calldata _options) 
+    external view returns (MessagingFee memory)
+```
+
+**CCTP Configuration:**
+- **TokenMessenger:** `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA` (Base Sepolia)
+- **USDC:** `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (Base Sepolia)
+- **Destination Domain:** 5 (Solana)
+- **Finality Threshold:** 1000 (Fast Transfer ~10-30s)
+- **Fee:** 1 bps (0.01%) = 0.01 USDC per 100 USDC
+
+**LayerZero Configuration:**
+- **Endpoint ID:** 40245 (Base Sepolia V2 Testnet)
+- **Message Type:** 1 (standard cross-chain message)
+- **Gas Limit:** 800,000 compute units (Solana)
+
+### 2. my_oapp (Solana) - Solana Devnet
+
+Anchor program implementing LayerZero V2 OApp on Solana.
+
+**Location:** `programs/my_oapp/src/`
+
+**Key Features:**
+- LayerZero message reception via `lz_receive`
+- User balance tracking (PDA per EVM address)
+- **Automatic Jupiter Lend deposits** - USDC immediately deposited for yield
+- Deposit event emission for indexing
+- Address Lookup Table (ALT) support for account optimization
+- fToken balance tracking (Jupiter Lend yield-bearing tokens)
+
+**Program Structure:**
+
+```
+programs/my_oapp/src/
+├── lib.rs                 # Program entry point
+├── instructions/
+│   ├── init_store.rs      # Initialize global Store PDA
+│   ├── lz_receive.rs      # Process LayerZero messages
+│   ├── send.rs            # Send messages back to EVM
+│   ├── quote_send.rs      # Quote fees for sending
+│   └── set_peer_config.rs # Configure peer chains
+├── state/
+│   ├── store.rs           # Global Store account
+│   └── peer_config.rs     # Peer chain configuration
+└── msg_codec.rs           # Message encoding/decoding
+```
+
+**Key Instructions:**
+
+```rust
+// Initialize the Store PDA (one-time setup)
+pub fn init_store(ctx: Context<InitStore>, params: InitStoreParams) -> Result<()>
+
+// Initialize Store's USDC and fToken ATAs for Jupiter Lend
+pub fn init_store_atas(ctx: Context<InitStoreAtas>) -> Result<()>
+
+// Configure Jupiter Lend parameters (admin only)
+pub fn set_jl_config(ctx: Context<SetJlConfig>, params: SetJlConfigParams) -> Result<()>
+
+// Process incoming LayerZero messages + deposit to Jupiter Lend
+pub fn lz_receive(ctx: Context<LzReceive>, params: LzReceiveParams) -> Result<()>
+
+// Configure peer chain settings (admin only)
+pub fn set_peer_config(ctx: Context<SetPeerConfig>, params: SetPeerConfigParams) -> Result<()>
+
+// Set Address Lookup Table for V2 account compression
+pub fn set_alt(ctx: Context<SetAlt>) -> Result<()>
+
+// Quote fee for sending messages back to EVM
+pub fn quote_send(ctx: Context<QuoteSend>, params: QuoteSendParams) -> Result<MessagingFee>
+```
+
+**Program Accounts:**
+
+```rust
+// Global Store PDA (stores USDC and Jupiter Lend configuration)
+// Seeds: ["Store"]
+pub struct Store {
+    pub admin: Pubkey,                              // Program admin
+    pub bump: u8,                                   // PDA bump
+    pub endpoint_program: Pubkey,                   // LayerZero endpoint
+    
+    // SPL Token Programs
+    pub usdc_mint: Pubkey,                          // USDC mint address
+    pub token_program: Pubkey,                      // SPL Token program
+    pub associated_token_program: Pubkey,           // ATA program
+    pub system_program: Pubkey,                     // System program
+    
+    // Jupiter Lend Configuration (Earn protocol)
+    pub jl_lending_program: Pubkey,                 // Jupiter Lend program
+    pub jl_liquidity_program: Pubkey,               // Jupiter Liquidity program
+    pub jl_lending_admin: Pubkey,                   // Lending admin account
+    pub jl_lending: Pubkey,                         // Lending account
+    pub jl_f_token_mint: Pubkey,                    // fToken mint (yield receipt)
+    pub jl_supply_token_reserves_liquidity: Pubkey, // USDC reserves
+    pub jl_lending_supply_position_on_liquidity: Pubkey, // Position tracking
+    pub jl_rate_model: Pubkey,                      // Interest rate model
+    pub jl_vault: Pubkey,                           // Jupiter vault
+    pub jl_liquidity: Pubkey,                       // Liquidity account
+    pub jl_rewards_rate_model: Pubkey,              // Rewards rate model
+}
+
+// User Balance PDA (tracks deposits per EVM address)
+// Seeds: ["UserBalance", evm_address]
+pub struct UserBalance {
+    pub evm_address: [u8; 20],      // User's EVM address
+    pub total_deposited: u64,       // Total deposited by user
+    pub total_withdrawn: u64,       // Total withdrawn (future)
+    pub ftoken_balance: u64,        // Current fToken balance from Jupiter
+    pub last_updated: i64,          // Last activity timestamp
+    pub deposit_count: u32,         // Number of deposits
+    pub bump: u8,                   // PDA bump
+}
+```
+
+**LayerZero Configuration:**
+- **Endpoint ID:** 40168 (Solana Devnet)
+- **Endpoint Program:** LayerZero V2 Endpoint on Solana
+- **DVN:** LayerZero Labs DVN
+- **Message Type:** 1 (standard cross-chain message)
+
+### 3. CCTP Attestation Bot
+
+Automated Node.js service that bridges the gap between CCTP and Solana.
+
+**Location:** `bot/cctp-attestation-bot.js`
+
+**Responsibilities:**
+1. Monitor Base Sepolia for `CctpDepositInitiated` events
+2. Fetch attestation signatures from Circle Iris API
+3. Submit attestations to Solana MessageTransmitter
+4. Confirm USDC minting on Solana
+5. Track processed transactions to avoid duplicates
+
+**Bot Architecture:**
+
+```javascript
+// Event Listener
+provider.on(MyOApp.filters.CctpDepositInitiated(), async (event) => {
+  // 1. Extract nonce, user, amount from event
+  // 2. Check if already processed
+  // 3. Fetch attestation from Circle API
+  // 4. Submit to Solana MessageTransmitter
+  // 5. Verify USDC minted
+  // 6. Mark as processed
+})
+```
+
+**Circle CCTP Integration:**
+- **Iris API:** `https://iris-api-sandbox.circle.com/v1/attestations/{messageHash}`
+- **MessageTransmitter (Solana):** `CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC`
+- **TokenMessengerMinter (Solana):** `CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe`
+- **USDC Mint (Solana):** `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
+
+**State Management:**
+- Processed transactions stored in `bot/processed-transactions.json`
+- Automatic state persistence on each successful attestation
+
+**Risk:**
+- If this service fails, only downside is the decreased UX and can not be resulted with any loss funds.
+- CCTP attestations are public. Anyone can provide the attestation on the destination chain and trigger the transaction.
+- Transaction's parameters can not be changed and will be same with the ones on source transaction.
+
+## Tech Stack
+
+### EVM (Base Sepolia)
+- **Solidity ^0.8.22** - Smart contract language
+- **LayerZero V2 OApp** - Cross-chain messaging framework
+- **Circle CCTP V2** - Native USDC transfer protocol
+- **OpenZeppelin** - Standard contracts (Ownable, SafeERC20)
+- **Hardhat** - Development and deployment
+
+### Solana (Devnet)
+- **Rust 1.75+** - Smart contract language
+- **Anchor 0.29.0** - Solana development framework
+- **LayerZero V2 SDK** - Cross-chain messaging SDK for Solana
+- **SPL Token** - Solana token standard
+- **Metaplex UMI** - Unified Solana framework
+
+### Bot & Tooling
+- **Node.js 18+** - Runtime
+- **ethers.js v5** - Ethereum interaction
+- **@solana/web3.js** - Solana interaction
+- **axios** - HTTP requests (Circle API)
+- **TypeScript** - Type-safe development
 
 ## Setup
 
-We recommend using `pnpm` as a package manager (but you can of course use a package manager of your choice).
+### Prerequisites
 
-[Docker](https://docs.docker.com/get-started/get-docker/) is required to build using anchor. We highly recommend that you use the most up-to-date Docker version to avoid any issues with anchor
-builds.
+1. **Node.js 18+** and **pnpm**
+2. **Rust 1.75+** and **Cargo**
+3. **Anchor CLI 0.29.0**
+   ```bash
+   cargo install --git https://github.com/coral-xyz/anchor --tag v0.29.0 anchor-cli
+   ```
+4. **Solana CLI 1.18+**
+   ```bash
+   sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+   ```
 
-:warning: You need anchor version `0.29` and solana version `1.17.31` specifically to compile the build artifacts. Using higher Anchor and Solana versions can introduce unexpected issues during compilation. See the following issues in Anchor's repo: [1](https://github.com/coral-xyz/anchor/issues/3089), [2](https://github.com/coral-xyz/anchor/issues/2835). After compiling the correct build artifacts, you can change the Solana version to higher versions.
+### Installation
 
-### Install Rust
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
+
+2. **Build Solana program:**
+   ```bash
+   anchor build
+   ```
+
+3. **Build EVM contracts:**
+   ```bash
+   npx hardhat compile
+   ```
+
+### Environment Configuration
+
+Create a `.env` file in the root:
+
+```env
+# EVM Configuration
+BASE_SEPOLIA_RPC=https://sepolia.base.org
+PRIVATE_KEY=your_deployer_private_key_here
+BASESCAN_API_KEY=your_basescan_api_key_here
+
+# Solana Configuration
+SOLANA_RPC=https://api.devnet.solana.com
+SOLANA_PAYER=~/.config/solana/id.json
+
+# Contract Addresses (update after deployment)
+MYOAPP_EVM_ADDRESS=0x...
+MYOAPP_SOLANA_ADDRESS=67K1bWanFMMgCT2Yx6MhKZNk8ng6DiRCNVPNjqWe2WPL
+
+# CCTP Configuration (Base Sepolia)
+CCTP_TOKEN_MESSENGER=0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA
+USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+
+# CCTP Configuration (Solana Devnet)
+USDC_MINT_SOLANA=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+MESSAGE_TRANSMITTER=CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC
+```
+
+## Deployment
+
+### 1. Deploy Solana Program
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-```
+# Set Solana config to devnet
+solana config set --url devnet
 
-### Install Solana
+# Create the MyOApp programId keypair file by running:
 
-```bash
-sh -c "$(curl -sSfL https://release.anza.xyz/v1.17.31/install)"
-```
-
-If this is your first time installing the Solana CLI, run the following to [generate a keypair](https://solana.com/docs/intro/installation#create-wallet) at the default keypair path (`~/.config/solana/id.json`):
-
-```bash
-solana-keygen new
-```
-
-### Install Anchor
-
-Install and use the correct version
-
-```bash
-cargo install --git https://github.com/coral-xyz/anchor --tag v0.29.0 anchor-cli --locked
-```
-
-### Get the code
-
-```bash
-LZ_ENABLE_SOLANA_OAPP_EXAMPLE=1 npx create-lz-oapp@latest
-```
-
-The CLI will also automatically run pnpm install for you.
-
-Make sure you select the **OApp (Solana)** example from the dropdown:
-
-```bash
-✔ Where do you want to start your project? … ./example
-? Which example would you like to use as a starting point? › - Use arrow-keys. Return to submit.
-    OApp
-    OFT
-    OFTAdapter
-    ONFT721
-    OFT (Solana)
-❯   OApp (Solana)
-```
-
-## Developing Contracts
-
-#### Compiling your contracts
-
-To compile the Solidity OApp contract and build the Solana OApp program, run:
-
-```bash
-pnpm compile
-```
-
-#### Get Devnet SOL
-
-```bash
-solana airdrop 5 -u devnet
-```
-
-We recommend that you request 5 devnet SOL, which should be sufficient for this walkthrough. For the example here, we will be using Solana Devnet. If you hit rate limits, you can also use the [official Solana faucet](https://faucet.solana.com/).
-
-#### Prepare `.env`
-
-Copy the example `.env` file:
-
-```bash
-cp .env.example .env
-```
-
-and fill up the values.
-
-##### EVM Private Key
-
-Choose your preferred means of setting up your EVM deployer wallet/account:
-
-```
-MNEMONIC="test test test test test test test test test test test junk"
-or...
-PRIVATE_KEY="0xabc...def"
-```
-
-##### Solana Keypair
-
-By default, the scripts will use the keypair at the default location `~/.config/solana/id.json`. If you want to use this keypair, there is no need to set any environment variable. There will, however, be a prompt when running certain commands to confirm that you want to use the default keypair.
-
-If you wish to use a different keypair, then you can set either of the following in the `.env`:
-
-1. `SOLANA_PRIVATE_KEY` - this can be either in base58 string format (i.e. when imported from a wallet) or the Uint8 Array in string format (all in one line, e.g. `[1,1,...1]`).
-
-2. `SOLANA_KEYPAIR_PATH` - the location to the keypair file that you want to use.
-
-##### Solana RPC
-
-Also set the `RPC_URL_SOLANA_TESTNET` value. Note that while the naming used here is `TESTNET`, it refers to the [Solana Devnet](https://docs.layerzero.network/v2/developers/evm/technical-reference/deployed-contracts#solana-testnet). We use `TESTNET` to keep it consistent with the existing EVM testnets.
-
-## Deploying Contracts
-
-### Prepare the OApp Program ID
-
-Create the MyOApp `programId` keypair file by running:
-
-```bash
 solana-keygen new -o target/deploy/my_oapp-keypair.json
-anchor keys sync            url: process.env.RPC_URL_ARB_SEPOLIA || 'https://rpc.notadegen.com/base/sepolia',
+anchor keys sync
 
-```
+# Run
 
-Run
-
-```
 anchor keys list
-```
 
-to view the generated programId (public keys). The output should look something like this:
-
-```
+# to view the generated programId (public keys). The output should look something like this:
 my_oapp: <OAPP_PROGRAM_ID>
-```
 
-Copy the OApp's program ID, which you will use in the build step.
-
-### Building and Deploying the Solana MyOApp Program
-
-Ensure you have Docker running before running the build command.
-
-#### Build the Solana MyOApp program
-
-```bash
+# Get the verifiable build of Solana MyOApp program
 anchor build -v -e MYOAPP_ID=<OAPP_PROGRAM_ID>
-```
 
-Where `<OAPP_PROGRAM_ID>` is replaced with your OApp Program ID copied from the previous step.
-
-#### Deploy the Solana OApp
-
-While for building, we must use Solana `v1.17.31`, for deploying, we will be using `v1.18.26` as it provides an improved program deployment experience (i.e. ability to attach priority fees and also exact-sized on-chain program length which prevents needing to provide 2x the rent as in `v1.17.31`).
-
-##### Temporarily switch to Solana `v1.18.26`
-
-First, we switch to Solana `v1.18.26` (remember to switch back to `v1.17.31` later)
-
-```bash
-sh -c "$(curl -sSfL https://release.anza.xyz/v1.18.26/install)"
-```
-
-##### Run the deploy command
-
-```bash
+# Run the deploy command for verifiable directory deploy (by docker)
 solana program deploy --program-id target/deploy/my_oapp-keypair.json target/verifiable/my_oapp.so -u devnet --with-compute-unit-price <COMPUTE_UNIT_PRICE_IN_MICRO_LAMPORTS>
-```
 
-```bash
+# Run the deploy command for direct build
 solana program deploy --program-id target/deploy/my_oapp-keypair.json target/deploy/my_oapp.so -u devnet
-``` 
 
-Set the storage accounts
-```bash
-npx hardhat lz:oapp:solana:set-jl-config --eid 40168 --jl-config ../vault8-frontend/scripts/jl-context-devnet-usdc.json
 ```
 
-Fund the Store USDC ATA with USDC on Devnet.
-
-:information_source: `--with-compute-unit-price` takes in the microlamport value applied per compute unit. This is how we can attach a [priority fee](https://solana.com/vi/developers/guides/advanced/how-to-use-priority-fees) to our deployment.
-
-:information_source: the `-u` flag specifies the RPC URL that should be used. The options are `mainnet-beta, devnet, testnet, localhost`, which also have their respective shorthands: `-um, -ud, -ut, -ul`
-
-:warning: If the deployment is slow, it could be that the network is congested and you might need to increase the priority fee.
-
-##### Switch back to Solana `1.17.31`
-
-:warning: After deploying, make sure to switch back to v1.17.31 after deploying. If you need to rebuild artifacts, you must use Solana CLI version `1.17.31` and Anchor version `0.29.0`
+### 2. Initialize Solana Store
 
 ```bash
-sh -c "$(curl -sSfL https://release.anza.xyz/v1.17.31/install)"
-```
-
-### Initialize the Solana OApp account
-
-Solana programs require accounts to be initialized before state can be written.
-
-Run the following to init the OApp store account:
-
-```bash
+# Run the following to init the OApp store account:
 npx hardhat lz:oapp:solana:create --eid 40168 --program-id <PROGRAM_ID>
+
+# Configure Jupiter Lend parameters
+npx hardhat task:solana:set-jl-config \
+  --network solana-testnet
+
+# Create Store's USDC and fToken ATAs
+npx hardhat run deployment-helpers/init-store-atas.js
+
+# Create Address Lookup Table for account optimization
+npx hardhat task:solana:set-alt \
+  --network solana-testnet
 ```
 
-:information_source: The address of this account (and **not** the OApp program ID) is what will be used as the OApp address in the context of cross-chain messaging.
-
-:information_source: The example `init_store` method being called by this task can be called by anyone, and can only be called once. Modify it accordingly if for your use case it should be access controlled or callable multiple times based on some param value.
-
-##### Deploy the EVM OApp
-
-To deploy your Solidity contracts to your desired EVM blockchain(s), run the following command in your project's folder:
+### 3. Deploy EVM Contract (Base Sepolia)
 
 ```bash
+# Deploy MyOApp
 npx hardhat lz:deploy
+
+# Apply the tag MyOApp and choose BASE-sepolia with toggles.
 ```
 
-You will be presented with a list of networks that have been defined via your `hardhat.config.ts`. Select the ones you want to deploy to.
+### 4. Configure LayerZero Wiring
 
-More information about available CLI arguments can be found using the `--help` flag:
-
-```bash
-npx hardhat lz:deploy --help
-```
-
-### Wiring
-
-Wiring will apply the settings configured in the [LZ config](https://docs.layerzero.network/v2/concepts/glossary#lz-config) file. By default, this file is named `layerzero.config.ts`.
-
-#### Run the Solana `init-config` task
-
-This step is required only for the Solana OApp and is again required due to the need to init accounts explicitly.
-
-The task initializes the OApp's SendConfig and ReceiveConfig Accounts.
-
-You need to do this only when initializing the OApp for the first time. However, if a new pathway involving Solana is added, you need to run this again as the SendConfig and ReceiveConfig accounts are required per peer.
+LayerZero requires bidirectional peer configuration and DVN setup.
 
 ```bash
+# Generate configuration
 npx hardhat lz:oapp:solana:init-config --oapp-config layerzero.config.ts
-```
 
-#### Run the [wire task](https://docs.layerzero.network/v2/concepts/glossary#wire--wiring)
-
-Run the following to [wire](https://docs.layerzero.network/v2/concepts/glossary#wire--wiring) the pathways specified in your `layerzero.config.ts`
-
-```bash
 npx hardhat lz:oapp:wire --oapp-config layerzero.config.ts
 ```
 
-With a squads multisig, you can simply append the `--multisig-key` flag to the end of the above command.
-
-### Send Messages
-
-With your OApps wired, you can now send a message.
-
-Send from Solana Devnet (40168) to Base Sepolia (40245) :
+**Manual Configuration (Alternative):**
 
 ```bash
-npx hardhat lz:oapp:send --from-eid 40168 --dst-eid 40245 --message "Hello from Solana Devnet"
+# Set Solana peer on Base contract
+npx hardhat task:evm:set-peer \
+  --target-eid 40168 \
+  --peer SOLANA_OAPP_ADDRESS \
+  --network baseSepolia
+
+# Set Base peer on Solana program
+npx hardhat task:solana:set-peer \
+  --target-eid 40245 \
+  --peer BASE_OAPP_ADDRESS \
+  --network solana-testnet
 ```
 
-Send from Arbitrum Sepolia (40231) to Solana Devnet (40168) :
+### 5. Deploy CCTP Attestation Bot
 
 ```bash
-npx hardhat --network arbitrum-sepolia lz:oapp:send --from-eid 40245 --dst-eid 40168 --message "napaydim baseden solanaya mesajla beraber mi gecseydim"
+# Generate bot keypair
+cd bot
+./setup-bot-keypair.sh
+
+# Fund bot wallet (needs ~0.5 SOL for transaction fees)
+solana airdrop 1 TNGVQ5g4Wr8TLJLGqiVqnW7bKBvM2bjNFZ8fvnk9v5x
+
+# Start bot (use PM2 for production)
+./start-bot.sh
+
+# Or run directly
+MYOAPP_ADDRESS=0x... node bot/cctp-attestation-bot.js
 ```
 
-:information_source: For the list of supported chains and their endpoint ID's refer to the [Deployed Endpoints](https://docs.layerzero.network/v2/deployments/deployed-contracts) page.
+## Usage
 
-<br>
+### Deposit Flow (Base → Solana)
 
-Congratulations, you have now successfully set up an EVM <> Solana OApp.
+#### Step 1: Approve USDC
 
-### Running tests
+```javascript
+const usdc = await ethers.getContractAt("IERC20", USDC_ADDRESS);
+await usdc.approve(MYOAPP_ADDRESS, amount);
+```
 
-The `test` command will execute the hardhat and forge tests:
+#### Step 2: Initiate CCTP Deposit
+
+```javascript
+const myOApp = await ethers.getContractAt("MyOApp", MYOAPP_ADDRESS);
+const amount = ethers.parseUnits("100", 6); // 100 USDC
+
+const tx = await myOApp.depositViaCCTP(amount);
+const receipt = await tx.wait();
+
+// Extract nonce from event
+const event = receipt.events.find(e => e.event === "CctpDepositInitiated");
+const { nonce, user, grossAmount, netAmount } = event.args;
+
+console.log(`CCTP Deposit: ${ethers.formatUnits(netAmount, 6)} USDC (nonce: ${nonce})`);
+```
+
+> **Note:** The bot will automatically process this deposit and submit the attestation to Solana.
+
+#### Step 3: Check Pending Deposit
+
+```javascript
+const pending = await myOApp.getPendingDeposit(userAddress);
+console.log(`Pending: ${ethers.formatUnits(pending.amount, 6)} USDC (nonce: ${pending.nonce})`);
+```
+
+#### Step 4: Finalize with LayerZero
+
+After the bot completes CCTP attestation (~10-30 seconds), finalize the deposit:
+
+```javascript
+const dstEid = 40168; // Solana Devnet
+const options = "0x000301002101000000000000000000000000000927c0"; // Default LZ options
+
+// Quote LayerZero fee
+const { nativeFee } = await myOApp.quote(dstEid, options);
+console.log(`LayerZero fee: ${ethers.formatEther(nativeFee)} ETH`);
+
+// Send LayerZero message
+const tx = await myOApp.requestDeposit(dstEid, options, { value: nativeFee });
+await tx.wait();
+
+console.log("✅ Deposit finalized! USDC will arrive on Solana shortly.");
+```
+
+### Query Solana Deposit
 
 ```bash
-pnpm test
+# Check Store balance
+solana balance STORE_USDC_ATA_ADDRESS
+
+# Query user balance via program
+npx hardhat task:solana:get-user-balance \
+  --evm-address 0x... \
+  --network solana-testnet
 ```
 
-<br></br>
+## Testing
 
-<p align="center">
-  Join our <a href="https://layerzero.network/community" style="color: #a77dff">community</a>! | Follow us on <a href="https://x.com/LayerZero_Labs" style="color: #a77dff">X (formerly Twitter)</a>
-</p>
+### Manual Test Scripts
 
+The `scripts/` folder contains step-by-step CCTP testing scripts:
 
-Proof of succesfull message + jup deposit:
-https://testnet.layerzeroscan.com/tx/0xe7485eecbd75c22fa051a9d98a966aa542d9942f0c0ba2ac22847c44fa8f92aa
+```bash
+# 1. Check setup
+node scripts/cctp-0-check-setup.js
 
+# 2. Approve USDC
+node scripts/cctp-1-approve.js
 
-End-to-end tests:
-CCTP:
-Transaction Hash (Base): 0xb74606670b0a2a3f6383fe38c5031bef7d6e5e03c7acbd64cb9844331a5d6dd4
+# 3. Deposit via CCTP
+node scripts/cctp-2-deposit.js
 
-Check Solana Explorer: https://explorer.solana.com/address/MHso38U1uo8br3gSU6bXKC8apXorKzfwPqMVgYaKCma?cluster=devnet
+# 4. Fetch attestation
+node scripts/cctp-3-fetch-attestation.js
 
-LZ Messages:
-LayerZero Scan:
-https://testnet.layerzeroscan.com/tx/0xfb222c1c48e23071692fb24fc70dd611bde6686158999b3eb28ea6077b1eb0d3
+# 5. Submit to Solana
+node scripts/cctp-4-solana-receive.js
 
-Base Sepolia Transaction:
-https://sepolia.basescan.org/tx/0xfb222c1c48e23071692fb24fc70dd611bde6686158999b3eb28ea6077b1eb0d3
+# 6. Finalize with LayerZero
+node scripts/cctp-5-lz-finalize.js
+```
+
+### Automated Tests
+
+CCTP + LayerZero End-to-End Testing Script:
+
+```bash
+./scripts/tester.sh <MYOAPP_ADDRESS>
+```
+
+## Troubleshooting
+
+### EVM (Base Sepolia)
+
+**Deposit Fails:**
+- Check USDC approval: `usdc.allowance(user, myOApp)`
+- Verify sufficient USDC balance
+- Ensure user has ETH for gas
+
+**Pending Deposit Not Recorded:**
+- Check `CctpDepositInitiated` event was emitted
+- Verify nonce is unique (CCTP rejects duplicates)
+
+**LayerZero Message Fails:**
+- Check pending deposit exists: `getPendingDeposit(user)`
+- Verify sufficient ETH sent for LayerZero fee
+- Ensure bot has completed CCTP attestation
+
+### Solana Program
+
+**lz_receive Fails:**
+- Check Store USDC ATA exists and has balance
+- Verify LayerZero peer configuration is correct
+- Ensure ALT is set (if using compressed accounts)
+
+**UserBalance PDA Not Created:**
+- Check LayerZero message was delivered (check LayerZero Scan)
+- Verify message format matches msg_codec expectations
+
+### CCTP Attestation Bot
+
+**Bot Not Processing:**
+- Check `MYOAPP_ADDRESS` is set correctly
+- Verify bot is listening on correct RPC
+- Check bot's Solana balance (needs SOL for txs)
+
+**Attestation Fetch Fails:**
+- Wait ~10-30 seconds after CCTP deposit for Fast Transfer
+- Check Circle Iris API status
+- Verify transaction was confirmed on Base
+
+**Solana Submission Fails:**
+- Check message hash matches CCTP deposit
+- Verify attestation signature is valid
+- Ensure Store USDC ATA exists and is correct
+
+## Monitoring
+
+### Bot Status
+
+```bash
+# Check processed transactions
+cat bot/processed-transactions.json
+```
+
+### LayerZero Messaging
+
+- **LayerZero Scan:** https://testnet.layerzeroscan.com
+- Search by transaction hash or OApp address
+- View message status: INFLIGHT, DELIVERED, FAILED
+
+### CCTP Status
+
+- **Circle Attestation API:** https://iris-api-sandbox.circle.com
+- Query: `GET /v1/attestations/{messageHash}`
+- Status: `pending_confirmations`, `complete`
+
+## Contract Addresses
+
+### Base Sepolia
+```
+MyOApp:             0x0D7FBc907154De84897d9E0Db4B99C391A529488
+USDC:               0x036CbD53842c5426634e7929541eC2318f3dCF7e
+CCTP TokenMessenger: 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA
+LayerZero Endpoint: 0x6EDCE65403992e310A62460808c4b910D972f10f
+```
+
+### Solana Devnet
+```
+my_oapp Program:    67K1bWanFMMgCT2Yx6MhKZNk8ng6DiRCNVPNjqWe2WPL
+Store USDC ATA:     MHso38U1uo8br3gSU6bXKC8apXorKzfwPqMVgYaKCma
+USDC Mint:          4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+MessageTransmitter: CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC
+LayerZero Endpoint: 6xULyBGr1DyuJ3WZxCpvfQ2DRGCQPFCC8FzLSKvZvdXG
+```
+
+## Jupiter Lend Integration
+
+### How It Works
+
+When `lz_receive` is called (after USDC arrives via CCTP), the program automatically performs a CPI (Cross-Program Invocation) to Jupiter Lend:
+
+```rust
+// From lz_receive.rs (lines 127-196)
+// After updating UserBalance, immediately deposit to Jupiter Lend
+
+// 1. Parse Jupiter Lend accounts from remaining_accounts
+// 2. Build deposit instruction with amount
+let mut data: Vec<u8> = vec![242, 35, 198, 137, 82, 225, 242, 182]; // deposit discriminator
+data.extend_from_slice(&amount.to_le_bytes());
+
+// 3. Invoke Jupiter Lend deposit with Store PDA as signer
+invoke_signed(&ix, jl_ix_accounts, &[signer_seeds])?;
+```
+
+**What Happens:**
+1. **USDC Deposited:** Store's USDC ATA balance decreases
+2. **fTokens Minted:** Store receives fTokens (yield-bearing receipt tokens)
+3. **Yield Accrues:** Jupiter Lend automatically compounds interest
+4. **UserBalance Updated:** Tracks fToken balance for each user
+
+### Jupiter Lend Configuration
+
+The Store PDA contains all Jupiter Lend pool configuration:
+
+| Parameter | Description |
+|-----------|-------------|
+| `jl_lending_program` | Jupiter Lend Earn program ID |
+| `jl_liquidity_program` | Jupiter Liquidity program ID |
+| `jl_lending` | Lending market account for USDC |
+| `jl_f_token_mint` | fUSDC mint (yield-bearing token) |
+| `jl_supply_token_reserves_liquidity` | USDC reserves account |
+| `jl_rate_model` | Interest rate calculation model |
+| `jl_vault` | Jupiter vault account |
+| `jl_liquidity` | Liquidity pool account |
+
+### Account Optimization
+
+Jupiter Lend requires 18 accounts for the deposit CPI. To fit within Solana's transaction size limits:
+
+- **Address Lookup Table (ALT):** Compresses Jupiter Lend accounts
+- **lz_receive_types_v2:** Returns ALT-compressed account list
+- **LayerZero Executor:** Resolves ALT and provides full accounts
+
+### Yield Management
+
+- **fToken Balance:** Each user's `UserBalance.ftoken_balance` tracks their share
+- **Automatic Compounding:** Jupiter Lend handles yield reinvestment
+- **Withdrawal (Future):** Users can request withdrawal via cross-chain message
+- **fToken → USDC:** Program will redeem fTokens back to USDC
+
+### Jupiter Lend on Devnet
+
+| Resource | Address |
+|----------|---------|
+| Lending Program | `7DGJVMZ8Vz7i6qGLpR9MmNqTQpKPxs6SnJvdxKSJBKcR` |
+| Liquidity Program | `JPLend1111111111111111111111111111111111` |
+| USDC Market | `4Sx1NLrQiK4b9FdLKe2DhQ9FHvRzJhzKN3LoD6BrEPnf` |
+| fUSDC Mint | `7F2cLdio3i6CCJaypj9VfNDPW2DwT3vkDmZJDEfmxu6A` |
+
+> **Note:** Addresses are for Solana Devnet.
+
+## Resources
+
+### LayerZero
+- [LayerZero V2 Docs](https://docs.layerzero.network/)
+- [Solana OApp Docs](https://docs.layerzero.network/v2/developers/solana/overview)
+- [LayerZero Scan](https://testnet.layerzeroscan.com)
+
+### Circle CCTP
+- [CCTP Docs](https://developers.circle.com/cctp)
+- [EVM Smart Contracts](https://developers.circle.com/cctp/evm-smart-contracts)
+- [Solana Programs](https://developers.circle.com/cctp/solana-programs)
+- [Iris API](https://developers.circle.com/cctp/iris-api)
+
+### Solana
+- [Anchor Docs](https://www.anchor-lang.com/)
+- [Solana Cookbook](https://solanacookbook.com/)
+- [SPL Token Program](https://spl.solana.com/token)
+
+### Jupiter
+- [Jupiter Lend Docs](https://station.jup.ag/docs/jupiter-lend/jupiter-lend)
+- [Jupiter Lend SDK](https://github.com/jup-ag/jup-lend-sdk)
+- [Jupiter Station](https://station.jup.ag/)
+
+## License
+
+MIT
